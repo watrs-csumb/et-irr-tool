@@ -306,7 +306,7 @@ server <- function(input, output, session) {
         "Applied Water Event, in." = "#0288D1",
         "Questionable (0 ETa)" = "#FF8F00"
       )) +
-      scale_fill_manual(values = c("Precipitation (OpenET), in." = "#90CAF9")) +
+      scale_fill_manual(values = c("Precipitation, in." = "#90CAF9")) +
       labs(x = NULL, y = "Soil Water, in.", color = NULL, fill = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
@@ -316,7 +316,7 @@ server <- function(input, output, session) {
   output$deep_plot <- renderPlotly({
     df <- make_excel_plot_balance(balance(), setup_values())
     p <- ggplot(df, aes(x = date)) +
-      geom_col(aes(y = precip_plot_in, fill = "Precipitation (OpenET), in."),
+      geom_col(aes(y = precip_plot_in, fill = "Precipitation, in."),
         alpha = 0.55, na.rm = TRUE
       ) +
       geom_line(aes(
@@ -334,7 +334,7 @@ server <- function(input, output, session) {
         "Σ Deep Percolation, in." = "#1565C0",
         "Leaching Fraction" = "#C62828"
       )) +
-      scale_fill_manual(values = c("Precipitation (OpenET), in." = "#90CAF9")) +
+      scale_fill_manual(values = c("Precipitation, in." = "#90CAF9")) +
       labs(x = NULL, y = "Inches / Fraction", color = NULL, fill = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
@@ -350,7 +350,7 @@ server <- function(input, output, session) {
         rownames = FALSE,
         colnames = c(
           "Date", "Net Water Applied, in.", "Σ Net Applied, in.",
-          "Equiv. Irrig. Hours", "Precip. (OpenET), in.",
+          "Equiv. Irrig. Hours", "Precip. in.",
           "Soil Water Deficit, in.", "Notes / Flow Meter"
         ),
         options = list(pageLength = 15, scrollX = TRUE, ordering = FALSE)
@@ -378,7 +378,7 @@ server <- function(input, output, session) {
       deep_percolated_water_in = "Deep Percolation Water, in.",
       cumulative_deep_percolated_in = "Σ Deep Percolation, in.",
       leaching_fraction = "Leaching Fraction",
-      precip_in = "Precipitation (OpenET), in.",
+      precip_in = "Precipitation, in.",
       applied_plot_in = "Applied Water Events, in.",
       precip_plot_in = "Precip. Events, in.",
       soil_water_deficit_in = "Soil Water Deficit, in.",
