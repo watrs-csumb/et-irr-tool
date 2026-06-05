@@ -434,30 +434,47 @@ server <- function(input, output, session) {
 
   output$deep_plot <- renderPlotly({
     df <- make_excel_plot_balance(balance(), setup_values())
-    p <- ggplot(df, aes(x = date)) +
-      geom_col(aes(y = precip_plot_in, fill = "Precipitation, in."),
-        alpha = 0.55, na.rm = TRUE
-      ) +
-      geom_line(aes(
-        y = cumulative_deep_percolated_in,
-        color = "Σ Deep Percolation, in."
-      ), linewidth = 1.2) +
-      geom_line(
-        aes(
-          y = leaching_fraction,
-          color = "Leaching Fraction"
+    plot_ly(df, x = ~date) |>
+      add_bars(
+        y = ~precip_plot_in, name = "Precipitation, in.",
+        marker = list(color = "rgba(144,202,249,0.55)"),
+        hovertemplate = "%{x|%b %d, %Y}<br>Precipitation: %{y:.3f} in.<extra></extra>",
+        yaxis = "y"
+      ) |>
+      add_lines(
+        y = ~cumulative_deep_percolated_in, name = "\u03a3 Deep Percolation, in.",
+        line = list(color = "#1565C0", width = 2),
+        hovertemplate = "%{x|%b %d, %Y}<br>\u03a3 Deep Percolation: %{y:.3f} in.<extra></extra>",
+        yaxis = "y"
+      ) |>
+      add_lines(
+        y = ~leaching_fraction, name = "Leaching Fraction",
+        line = list(color = "#C62828", width = 1.5, dash = "dash"),
+        hovertemplate = "%{x|%b %d, %Y}<br>Leaching Fraction: %{y:.3f}<extra></extra>",
+        connectgaps = FALSE,
+        yaxis = "y2"
+      ) |>
+      layout(
+        hovermode = "x unified",
+        xaxis = list(
+          type = "date", autorange = TRUE, tickmode = "auto",
+          hoverformat = "%b %d, %Y",
+          showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
-        linewidth = 1.0, linetype = "dashed", na.rm = TRUE
-      ) +
-      scale_color_manual(values = c(
-        "Σ Deep Percolation, in." = "#1565C0",
-        "Leaching Fraction" = "#C62828"
-      )) +
-      scale_fill_manual(values = c("Precipitation, in." = "#90CAF9")) +
-      labs(x = NULL, y = "Inches / Fraction", color = NULL, fill = NULL) +
-      theme_minimal(base_size = 13) +
-      theme(legend.position = "top", legend.text = element_text(size = 10))
-    plotly_date_layout(clean_plotly_hover(ggplotly(p)))
+        yaxis = list(
+          title = "Inches",
+          showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
+        ),
+        yaxis2 = list(
+          title = "Leaching Fraction",
+          overlaying = "y", side = "right",
+          range = list(0, 1),
+          showgrid = FALSE,
+          tickformat = ".2f"
+        ),
+        legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.08),
+        margin = list(r = 60)
+      )
   })
 
   output$irrig_table <- renderDT(
