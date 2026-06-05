@@ -133,6 +133,16 @@ body { background-color: #f5f7fb; }
 .warn-box { background: #fff7e6; border: 1px solid #ffd591; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
 .ok-box { background: #ecfdf3; border: 1px solid #abefc6; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
 .help-text { color: #667085; font-size: 13px; }
+.well { background-color: #c9d47a !important; border: none !important; box-shadow: none !important; }
+.well label, .well h4, .well h5, .well p, .well .help-block, .well .control-label { color: #0d1f33 !important; }
+.well input[type='text'], .well input[type='password'], .well input[type='number'], .well select, .well .form-control { background-color: #eef2d0; color: #0d1f33; border: 1px solid #b0be5a; }
+.well input[type='text']::placeholder, .well input[type='password']::placeholder { color: #7a8a40; }
+.well hr { border-color: #b0be5a; }
+.well details > summary { cursor: pointer; font-size: 15px; padding: 4px 0; user-select: none; color: #0d1f33; }
+.well details > summary:hover { color: #2e86c1; }
+.well details { margin-bottom: 2px; }
+.well .btn-primary { background-color: #2e86c1; border-color: #2471a3; }
+.well .btn-info { background-color: #17a589; border-color: #148a72; }
 "
 
 ui <- fluidPage(
@@ -148,26 +158,39 @@ ui <- fluidPage(
         column(6, numericInput("lon", "Longitude", default_setup$longitude, step = 0.0001))
       ),
       hr(),
-      h4("Soil Properties"),
-      numericInput("app_rate", "Net application rate, in/hr", default_setup$application_rate_in_hr, step = 0.0001),
-      numericInput("field_capacity", "Field capacity, in.", default_setup$field_capacity_in, step = 0.1),
-      numericInput("initial_water", "Initial water content, in.", default_setup$initial_water_content_in, step = 0.1),
-      numericInput("allowable_dryness", "Allowable dryness, in.", default_setup$allowable_dryness_in, step = 0.1),
-      numericInput("pwp", "Permanent wilting point, in.", default_setup$permanent_wilting_point_in, step = 0.1),
+      tags$details(
+        open = NA,
+        tags$summary(tags$b("Soil Properties")),
+        br(),
+        numericInput("app_rate", "Net application rate, in/hr", default_setup$application_rate_in_hr, step = 0.0001),
+        numericInput("initial_water", "Initial water content, in.", default_setup$initial_water_content_in, step = 0.1),
+        numericInput("allowable_dryness", HTML("Allowable dryness, in."), default_setup$allowable_dryness_in, step = 0.1),
+        numericInput("field_capacity", HTML("Field capacity*, in."), default_setup$field_capacity_in, step = 0.1),
+        numericInput("pwp", HTML("Permanent wilting point*, in."), default_setup$permanent_wilting_point_in, step = 0.1),
+        tags$p(tags$em("* Can be updated using SSURGO"), style = "font-size: 11px; color: #4a6a8a; margin-top: 6px; margin-bottom: 2px;")
+      ),
       hr(),
-      h4("SSURGO"),
-      numericInput("root_depth_ft", "Root zone depth, ft", value = 4.0, min = 1, max = 20, step = 0.5),
-      actionButton("fetch_ssurgo", "Fetch Soil from SSURGO", class = "btn-info btn-sm"),
-      br(), br(),
-      verbatimTextOutput("ssurgo_status"),
+      tags$details(
+        open = NA,
+        tags$summary(tags$b("SSURGO")),
+        br(),
+        numericInput("root_depth_ft", "Root zone depth, ft", value = 4.0, min = 1, max = 20, step = 0.5),
+        actionButton("fetch_ssurgo", "Fetch Soil from SSURGO", class = "btn-info btn-sm"),
+        br(), br(),
+        verbatimTextOutput("ssurgo_status")
+      ),
       hr(),
-      h4("OpenET"),
-      passwordInput("api_key", "OpenET API key", default_setup$api_key),
-      selectInput("openet_model", "Model", choices = models, selected = default_setup$selected_model),
-      checkboxInput("download_all_models", "Download all ET models", default_setup$download_all_models),
-      actionButton("fetch_openet", "Update OpenET data", class = "btn-primary"),
-      br(), br(),
-      verbatimTextOutput("openet_status")
+      tags$details(
+        open = NA,
+        tags$summary(tags$b("OpenET")),
+        br(),
+        passwordInput("api_key", "OpenET API key", default_setup$api_key),
+        selectInput("openet_model", "Model", choices = models, selected = default_setup$selected_model),
+        checkboxInput("download_all_models", "Download all ET models", default_setup$download_all_models),
+        actionButton("fetch_openet", "Update OpenET data", class = "btn-primary"),
+        br(), br(),
+        verbatimTextOutput("openet_status")
+      )
     ),
     mainPanel(
       uiOutput("location_warning"),
@@ -476,13 +499,13 @@ server <- function(input, output, session) {
       ) |>
       add_lines(
         y = ~cumulative_deep_percolated_in, name = "\u03a3 Deep Percolation, in.",
-        line = list(color = "#1565C0", width = 2),
+        line = list(color = "#1565C0", width = 3.5),
         hovertemplate = "%{x|%b %d, %Y}<br>\u03a3 Deep Percolation: %{y:.3f} in.<extra></extra>",
         yaxis = "y"
       ) |>
       add_lines(
         y = ~leaching_fraction, name = "Leaching Fraction",
-        line = list(color = "#C62828", width = 1.5, dash = "dash"),
+        line = list(color = "#C62828", width = 2.5, dash = "dash"),
         hovertemplate = "%{x|%b %d, %Y}<br>Leaching Fraction: %{y:.3f}<extra></extra>",
         connectgaps = FALSE,
         yaxis = "y2"
@@ -507,6 +530,7 @@ server <- function(input, output, session) {
           tickformat = ".2f"
         ),
         legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.08),
+        font = list(size = 13),
         margin = list(r = 60)
       )
   })
