@@ -221,6 +221,35 @@ ui <- fluidPage(
           "Map",
           br(),
           leafletOutput("field_map", height = 520)
+        ),
+        tabPanel(
+          "FAQ",
+          br(),
+          h4("Frequently Asked Questions"),
+          hr(),
+          h5("What is OpenET?"),
+          p("OpenET uses satellite-based evapotranspiration (ET) data to provide daily, field-scale ET estimates across the western United States."),
+          p(a("Visit the OpenET website", href = "https://openetdata.org", target = "_blank")),
+          hr(),
+          h5("What models does OpenET provide?"),
+          p(
+            "OpenET includes six ET models — GEESEBAL, SSEBOP, SIMS, DISALEXI, PT-JPL, and eeMETRIC — as well as an ensemble mean. See the",
+            a("OpenET documentation", href = "https://openetdata.org/docs", target = "_blank"),
+            "for details on each model."
+          ),
+          hr(),
+          h5("What is SSURGO?"),
+          p("SSURGO (Soil Survey Geographic Database) is USDA's most detailed soil survey database. It provides soil properties such as field capacity and wilting point at the survey map unit level."),
+          p(a("Explore SSURGO data on the Web Soil Survey", href = "https://websoilsurvey.nrcs.usda.gov", target = "_blank")),
+          hr(),
+          h5("How is the soil water balance calculated?"),
+          p("The balance tracks daily soil water content using: Soil Water = Previous Soil Water + Irrigation + Effective Precipitation − ETa. An irrigation event is suggested when soil water drops below the allowable dryness threshold."),
+          hr(),
+          h5("Where do I get an OpenET API key?"),
+          p(
+            "Register for an API key at the",
+            a("OpenET account portal", href = "https://auth.openetdata.org", target = "_blank"), "."
+          )
         )
       )
     )
