@@ -304,16 +304,18 @@ compute_water_balance <- function(irrigation, openet, setup) {
   swc <- deep_perc <- numeric(n)
   prev <- initial_water
   for (i in seq_len(n)) {
-    # Excel Calcs L/S: previous soil water + Irrigation Amounts!B - ETa.
-    # OpenET precipitation is displayed separately and is only included if user enters effective precipitation in applied water.
-    raw_storage <- prev + daily$net_water_applied_in[i] - daily$eta_in[i]
+    effective_precip <- if (isTRUE(setup$count_precip_effective)) daily$precip_in[i] else 0
+    raw_storage <- prev + daily$net_water_applied_in[i] + effective_precip - daily$eta_in[i]
     deep_perc[i] <- ifelse(raw_storage > field_capacity, raw_storage - field_capacity, 0)
     swc[i] <- ifelse(raw_storage > field_capacity, field_capacity, raw_storage)
     prev <- swc[i]
   }
 
   cum_eta <- cumsum(daily$eta_in)
+  effective_precip_in <- if (isTRUE(setup$count_precip_effective)) daily$precip_in else rep(0, n)
+  water_credited_in <- daily$net_water_applied_in + effective_precip_in
   cum_applied <- cumsum(daily$net_water_applied_in)
+  cum_water_credited <- cumsum(water_credited_in)
   cum_deep <- cumsum(deep_perc)
   out <- data.frame(
     date = daily$date,
@@ -322,8 +324,11 @@ compute_water_balance <- function(irrigation, openet, setup) {
     cumulative_eta_in = cum_eta,
     questionable_cumulative_eta_in = ifelse(daily$eta_in == 0, cum_eta, NA_real_),
     net_water_applied_in = daily$net_water_applied_in,
+    effective_precip_in = effective_precip_in,
+    water_credited_in = water_credited_in,
     cumulative_applied_in = cum_applied,
-    applied_minus_eta_in = cum_applied - cum_eta,
+    cumulative_water_credited_in = cum_water_credited,
+    applied_minus_eta_in = cum_water_credited - cum_eta,
     soil_water_content_in = swc,
     field_capacity_in = field_capacity,
     allowable_dryness_in = allowable_dryness,
@@ -332,7 +337,7 @@ compute_water_balance <- function(irrigation, openet, setup) {
     questionable_soil_water_in = NA_real_,
     deep_percolated_water_in = deep_perc,
     cumulative_deep_percolated_in = cum_deep,
-    leaching_fraction = ifelse(cum_applied > 0, cum_deep / cum_applied, NA_real_),
+    leaching_fraction = ifelse(cum_water_credited > 0, cum_deep / cum_water_credited, NA_real_),
     precip_in = daily$precip_in,
     applied_plot_in = ifelse(daily$net_water_applied_in == 0, NA_real_, daily$net_water_applied_in),
     precip_plot_in = ifelse(daily$precip_in == 0, NA_real_, daily$precip_in),
@@ -368,7 +373,10 @@ make_excel_plot_balance <- function(balance, setup) {
   first$cumulative_eta_in <- 0
   first$questionable_cumulative_eta_in <- NA_real_
   first$net_water_applied_in <- 0
+  first$effective_precip_in <- 0
+  first$water_credited_in <- 0
   first$cumulative_applied_in <- 0
+  first$cumulative_water_credited_in <- 0
   first$applied_minus_eta_in <- 0
   first$soil_water_content_in <- safe_numeric(setup$initial_water_content_in %||% first$soil_water_content_in)
   first$soil_water_graph_in <- first$soil_water_content_in

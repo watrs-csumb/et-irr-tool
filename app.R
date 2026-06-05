@@ -29,8 +29,94 @@ default_setup <- list(
   start_date = default_start,
   end_date = default_end,
   selected_model = "ENSEMBLE",
-  download_all_models = FALSE
+  download_all_models = FALSE,
+  count_precip_effective = FALSE
 )
+
+plotly_date_layout <- function(p) {
+  p %>%
+    layout(
+      hovermode = "x unified",
+      xaxis = list(
+        type = "date",
+        autorange = TRUE,
+        tickmode = "auto",
+        hoverformat = "%b %d, %Y",
+        showspikes = TRUE,
+        spikemode = "across",
+        spikesnap = "cursor",
+        tickformatstops = list(
+          list(dtickrange = list(NULL, 86400000), value = "%b %d"),
+          list(dtickrange = list(86400000, 604800000), value = "%b %d"),
+          list(dtickrange = list(604800000, "M1"), value = "%b %d"),
+          list(dtickrange = list("M1", "M12"), value = "%b %Y"),
+          list(dtickrange = list("M12", NULL), value = "%Y")
+        )
+      ),
+      yaxis = list(showspikes = TRUE, spikemode = "across", spikesnap = "cursor")
+    )
+}
+
+
+clean_plotly_hover <- function(p) {
+  format_trace_dates <- function(x) {
+    if (is.null(x)) {
+      return(NULL)
+    }
+
+    # ggplotly often stores Date values as numeric days since 1970-01-01.
+    # Plotly hover date formatting treats numbers as milliseconds, which causes
+    # the Dec 31, 1969 tooltip bug. Build the display date ourselves instead.
+    if (inherits(x, "Date")) {
+      d <- x
+    } else if (inherits(x, "POSIXt")) {
+      d <- as.Date(x)
+    } else if (is.numeric(x)) {
+      d <- ifelse(abs(x) > 100000,
+        as.character(as.Date(as.POSIXct(x / 1000, origin = "1970-01-01", tz = "UTC"))),
+        as.character(as.Date(x, origin = "1970-01-01"))
+      )
+      d <- as.Date(d)
+    } else {
+      d <- suppressWarnings(as.Date(x))
+    }
+
+    if (all(is.na(d))) {
+      return(NULL)
+    }
+    format(d, "%b %d, %Y")
+  }
+
+  for (i in seq_along(p$x$data)) {
+    # ggplotly stores R Date as integer days since 1970-01-01, but plotly.js
+    # expects milliseconds. Multiply by 86400000 to fix the "Dec 31, 1969" bug.
+    x_raw <- p$x$data[[i]]$x
+    if (is.numeric(x_raw) && length(x_raw) > 0) {
+      finite_vals <- x_raw[is.finite(x_raw)]
+      if (length(finite_vals) > 0 && all(abs(finite_vals) < 1e5)) {
+        p$x$data[[i]]$x <- x_raw * 86400000
+      }
+    }
+
+    trace_name <- p$x$data[[i]]$name
+    if (is.null(trace_name) || is.na(trace_name) || !nzchar(trace_name)) {
+      trace_name <- "Value"
+    }
+    trace_name <- gsub("<[^>]+>", "", trace_name)
+    trace_name <- trimws(trace_name)
+
+    date_labels <- format_trace_dates(p$x$data[[i]]$x)
+    if (!is.null(date_labels)) {
+      p$x$data[[i]]$customdata <- date_labels
+      date_line <- if (i == 1) "Date: %{customdata}<br>" else ""
+    } else {
+      date_line <- if (i == 1) "Date: %{x}<br>" else ""
+    }
+
+    p$x$data[[i]]$hovertemplate <- paste0(date_line, trace_name, ": %{y:.2f}<extra></extra>")
+  }
+  p
+}
 
 app_css <- "
 body { background-color: #f5f7fb; }
@@ -45,7 +131,7 @@ body { background-color: #f5f7fb; }
 
 ui <- fluidPage(
   tags$head(tags$style(HTML(app_css))),
-  titlePanel("IST - OpenET"),
+  titlePanel("OpenET irrigation water balance dashboard"),
   sidebarLayout(
     sidebarPanel(
       h4("Initial Setup"),
@@ -92,7 +178,9 @@ ui <- fluidPage(
           br(),
           div(
             class = "wet-card",
-            p(class = "help-text", "Excel-equivalent rule: Net Water Applied is the input used by the water balance. OpenET precipitation is displayed separately; include effective precipitation here only when you want it counted as water applied."),
+            p(class = "help-text", "Excel-equivalent rule: Net Water Applied is the input used by the water balance. OpenET precipitation is displayed separately unless the option below is checked."),
+            checkboxInput("count_precip_effective", "Count all OpenET precipitation as effective water", value = default_setup$count_precip_effective),
+            p(class = "help-text", "When checked, the soil water balance credits OpenET precipitation in addition to entered irrigation: irrigation + precipitation - ETa."),
             fluidRow(
               column(3, dateInput("new_irrig_date", "Date", value = default_start)),
               column(3, numericInput("new_irrig_in", "Net water applied, in.", value = 0, step = 0.01)),
@@ -151,7 +239,8 @@ server <- function(input, output, session) {
       start_date = as.Date(input$date_range[1]),
       end_date = as.Date(input$date_range[2]),
       selected_model = input$openet_model,
-      download_all_models = isTRUE(input$download_all_models)
+      download_all_models = isTRUE(input$download_all_models),
+      count_precip_effective = isTRUE(input$count_precip_effective)
     )
   })
 
@@ -285,7 +374,7 @@ server <- function(input, output, session) {
       labs(x = NULL, y = "Cumulative Water, in.", color = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
-    ggplotly(p, tooltip = "y")
+    plotly_date_layout(clean_plotly_hover(ggplotly(p)))
   })
 
   output$soil_plot <- renderPlotly({
@@ -310,7 +399,7 @@ server <- function(input, output, session) {
       labs(x = NULL, y = "Soil Water, in.", color = NULL, fill = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
-    ggplotly(p, tooltip = "y")
+    plotly_date_layout(clean_plotly_hover(ggplotly(p)))
   })
 
   output$deep_plot <- renderPlotly({
@@ -338,7 +427,7 @@ server <- function(input, output, session) {
       labs(x = NULL, y = "Inches / Fraction", color = NULL, fill = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
-    ggplotly(p, tooltip = "y")
+    plotly_date_layout(clean_plotly_hover(ggplotly(p)))
   })
 
   output$irrig_table <- renderDT(
@@ -358,7 +447,7 @@ server <- function(input, output, session) {
         formatRound(columns = c("net_water_applied_in", "cumulative_applied_in", "equivalent_irrigation_hours", "precip_openet_in", "soil_water_deficit_in"), digits = 3)
     },
     server = TRUE
-  ) |> bindEvent(irrig_version(), ignoreNULL = FALSE)
+  )
 
   output$balance_table <- renderDT({
     df <- balance()
