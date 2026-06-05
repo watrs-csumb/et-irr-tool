@@ -237,7 +237,7 @@ ui <- fluidPage(
             a("OpenET documentation", href = "https://etdata.org/methods/", target = "_blank"),
             "for details on each model."
           ),
-          hr()
+          hr(),
           h5("Where do I get an OpenET API key?"),
           p(
             "Register for an API key at the",
