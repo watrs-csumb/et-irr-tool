@@ -104,6 +104,9 @@ clean_plotly_hover <- function(p) {
     }
     trace_name <- gsub("<[^>]+>", "", trace_name)
     trace_name <- trimws(trace_name)
+    trace_name <- gsub(",\\s*1$", "", trace_name)
+    trace_name <- gsub("\\(([^)]+),\\s*1\\)", "(\\1)", trace_name)
+    p$x$data[[i]]$name <- trace_name
 
     date_labels <- format_trace_dates(p$x$data[[i]]$x)
     if (!is.null(date_labels)) {
@@ -364,12 +367,10 @@ server <- function(input, output, session) {
       geom_line(aes(y = cumulative_eta_in, color = "Σ ETa, in."), linewidth = 1.0) +
       geom_line(aes(y = cumulative_applied_in, color = "Σ Applied Water, in."), linewidth = 1.0, linetype = "dashed") +
       geom_line(aes(y = applied_minus_eta_in, color = "Σ Applied − Σ ETa"), linewidth = 0.8, linetype = "dotdash") +
-      geom_point(aes(y = questionable_cumulative_eta_in, color = "Questionable (0 ETa)"), size = 2.5, na.rm = TRUE) +
       scale_color_manual(values = c(
         "Σ ETa, in." = "#C62828",
         "Σ Applied Water, in." = "#1565C0",
-        "Σ Applied − Σ ETa" = "#2E7D32",
-        "Questionable (0 ETa)" = "#FF8F00"
+        "Σ Applied − Σ ETa" = "#2E7D32"
       )) +
       labs(x = NULL, y = "Cumulative Water, in.", color = NULL) +
       theme_minimal(base_size = 13) +
@@ -386,14 +387,12 @@ server <- function(input, output, session) {
       geom_line(aes(y = allowable_dryness_in, color = "Allowable Dryness, in."), linetype = "dashed", linewidth = 0.8) +
       geom_line(aes(y = permanent_wilting_point_in, color = "Perm. Wilting Point, in."), linetype = "dashed", linewidth = 0.8) +
       geom_line(aes(y = soil_water_graph_in, color = "Soil Water Content, in."), linewidth = 1.1) +
-      geom_point(aes(y = questionable_soil_water_in, color = "Questionable (0 ETa)"), size = 2, shape = 4, stroke = 1.2, na.rm = TRUE) +
       scale_color_manual(values = c(
         "Soil Water Content, in." = "#1565C0",
         "Field Capacity, in." = "#2E7D32",
         "Allowable Dryness, in." = "#F57F17",
         "Perm. Wilting Point, in." = "#C62828",
-        "Applied Water Event, in." = "#0288D1",
-        "Questionable (0 ETa)" = "#FF8F00"
+        "Applied Water Event, in." = "#0288D1"
       )) +
       scale_fill_manual(values = c("Precipitation, in." = "#90CAF9")) +
       labs(x = NULL, y = "Soil Water, in.", color = NULL, fill = NULL) +
