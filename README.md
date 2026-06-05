@@ -1,4 +1,4 @@
-# OpenET wETgraph R Shiny app
+# OpenET R Shiny app
 
 This is the R Shiny version of the OpenET wETgraph app.
 
