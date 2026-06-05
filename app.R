@@ -53,7 +53,10 @@ plotly_date_layout <- function(p) {
           list(dtickrange = list("M12", NULL), value = "%Y")
         )
       ),
-      yaxis = list(showspikes = TRUE, spikemode = "across", spikesnap = "cursor")
+      yaxis = list(
+        tickmode = "auto", nticks = 10,
+        showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
+      )
     )
 }
 
@@ -463,6 +466,7 @@ server <- function(input, output, session) {
         ),
         yaxis = list(
           title = "Inches",
+          tickmode = "auto", nticks = 10,
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
         yaxis2 = list(
