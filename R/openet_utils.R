@@ -409,6 +409,120 @@ summary_metrics <- function(balance) {
   )
 }
 
+# ---------------------------------------------------------------------------
+# SSURGO soil properties via soilDB
+# ---------------------------------------------------------------------------
+
+fetch_ssurgo_soil_properties <- function(latitude, longitude, rooting_depth_ft = 4.0) {
+  if (!requireNamespace("soilDB", quietly = TRUE)) {
+    stop("Package 'soilDB' is required. Install it with install.packages('soilDB').")
+  }
+
+  rooting_depth_cm <- rooting_depth_ft * 30.48
+
+  # 1. Resolve mapunit key (mukey) for the coordinate point
+  wkt <- sprintf("POINT(%s %s)", as.numeric(longitude), as.numeric(latitude))
+  mukey_res <- soilDB::SDA_query(
+    sprintf("SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('%s')", wkt)
+  )
+  if (is.null(mukey_res) || nrow(mukey_res) == 0 || all(is.na(mukey_res$mukey))) {
+    stop(sprintf("No SSURGO data found at coordinates (%.5f, %.5f).", latitude, longitude))
+  }
+  mukey <- as.character(mukey_res$mukey[1])
+
+  # 2. Fetch horizon data for every component in this mapunit
+  hz <- soilDB::SDA_query(sprintf(
+    "SELECT c.cokey, c.compname, c.comppct_r,
+            h.hzdept_r, h.hzdepb_r,
+            h.wthirdbar_r, h.wfifteenbar_r, h.awc_r, h.dbthirdbar_r
+     FROM mapunit mu
+     INNER JOIN component c ON c.mukey = mu.mukey
+     INNER JOIN chorizon h ON h.cokey = c.cokey
+     WHERE mu.mukey = '%s'
+     ORDER BY c.comppct_r DESC, h.hzdept_r ASC", mukey
+  ))
+  if (is.null(hz) || nrow(hz) == 0) {
+    stop(sprintf("No horizon data found in SSURGO for this location (mukey: %s).", mukey))
+  }
+
+  # Use the dominant component (highest comppct_r)
+  dominant_cokey <- hz$cokey[which.max(hz$comppct_r)]
+  hz <- hz[hz$cokey == dominant_cokey, ]
+  hz <- hz[order(hz$hzdept_r), ]
+
+  # Clip horizons to rooting depth
+  hz <- hz[!is.na(hz$hzdept_r) & hz$hzdept_r < rooting_depth_cm, ]
+  if (nrow(hz) == 0) {
+    stop(sprintf("No soil horizons within %.1f ft rooting depth for this location.", rooting_depth_ft))
+  }
+  hz$hzdepb_r <- pmin(hz$hzdepb_r, rooting_depth_cm)
+  hz$thickness_cm <- hz$hzdepb_r - hz$hzdept_r
+  hz <- hz[!is.na(hz$thickness_cm) & hz$thickness_cm > 0, ]
+
+  total_cm <- sum(hz$thickness_cm)
+  if (total_cm == 0) stop("Zero total horizon thickness within the specified rooting depth.")
+  wt <- hz$thickness_cm / total_cm
+
+  # Thickness-weighted average helper
+  wavg <- function(x, w) {
+    ok <- !is.na(x)
+    if (!any(ok)) {
+      return(NA_real_)
+    }
+    sum(x[ok] * (w[ok] / sum(w[ok])))
+  }
+
+  # Convert gravimetric % to volumetric (cm3/cm3):
+  #   volumetric = (gravimetric_pct / 100) * bulk_density_g_cm3
+  # wthirdbar_r / wfifteenbar_r are in % by weight; dbthirdbar_r is g/cm3.
+  hz$fc_vol <- ifelse(!is.na(hz$wthirdbar_r) & !is.na(hz$dbthirdbar_r),
+    (hz$wthirdbar_r / 100) * hz$dbthirdbar_r, NA_real_
+  )
+  hz$pwp_vol <- ifelse(!is.na(hz$wfifteenbar_r) & !is.na(hz$dbthirdbar_r),
+    (hz$wfifteenbar_r / 100) * hz$dbthirdbar_r, NA_real_
+  )
+
+  fc_vol <- wavg(hz$fc_vol, wt)
+  pwp_vol <- wavg(hz$pwp_vol, wt)
+  awc_vol <- wavg(hz$awc_r, wt) # awc_r is already cm/cm (vol/vol)
+
+  rd_in <- rooting_depth_ft * 12
+  awc_in <- awc_vol * rd_in
+
+  # Field capacity and PWP in inches, with graceful fallbacks
+  fc_in <- if (!is.na(fc_vol)) {
+    fc_vol * rd_in
+  } else {
+    if (!is.na(pwp_vol)) pwp_vol * rd_in + awc_in else awc_in * 2
+  }
+  pwp_in <- if (!is.na(pwp_vol)) {
+    pwp_vol * rd_in
+  } else {
+    fc_in - awc_in
+  }
+
+  # Sanity check
+  if (is.na(fc_in) || fc_in <= 0) {
+    stop("Field capacity could not be calculated from SSURGO data for this location.")
+  }
+  fc_in <- max(fc_in, 0)
+  pwp_in <- max(min(pwp_in, fc_in - 0.01), 0)
+  awc_in <- max(awc_in, 0)
+
+  # Allowable dryness at 50% MAD (management allowed deficit) — common default
+  allowable_in <- max(fc_in - 0.5 * awc_in, pwp_in)
+
+  list(
+    compname             = as.character(hz$compname[1]),
+    mukey                = mukey,
+    rooting_depth_ft     = rooting_depth_ft,
+    field_capacity_in    = round(fc_in, 2),
+    pwp_in               = round(pwp_in, 2),
+    awc_in               = round(awc_in, 2),
+    allowable_dryness_in = round(allowable_in, 2)
+  )
+}
+
 write_balance_export <- function(balance, irrigation, openet, setup, path) {
   wb <- openxlsx::createWorkbook()
   for (s in c("Initial_Setup", "Irrigation Amounts", "OpenET", "Calcs", "Summary")) openxlsx::addWorksheet(wb, s)

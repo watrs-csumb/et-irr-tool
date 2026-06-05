@@ -152,6 +152,12 @@ ui <- fluidPage(
       numericInput("allowable_dryness", "Allowable dryness, in.", default_setup$allowable_dryness_in, step = 0.1),
       numericInput("pwp", "Permanent wilting point, in.", default_setup$permanent_wilting_point_in, step = 0.1),
       hr(),
+      h4("Soil Properties (SSURGO)"),
+      numericInput("root_depth_ft", "Root zone depth, ft", value = 4.0, min = 1, max = 20, step = 0.5),
+      actionButton("fetch_ssurgo", "Fetch Soil from SSURGO", class = "btn-info btn-sm"),
+      br(), br(),
+      verbatimTextOutput("ssurgo_status"),
+      hr(),
       h4("OpenET"),
       selectInput("openet_model", "Model for charts", choices = models, selected = default_setup$selected_model),
       checkboxInput("download_all_models", "Download all ET models", default_setup$download_all_models),
@@ -222,10 +228,12 @@ server <- function(input, output, session) {
   openet_data <- reactiveVal(make_empty_openet_range(default_start, default_end))
   openet_status <- reactiveVal("No OpenET API request made yet.")
   openet_location <- reactiveVal(list(latitude = NA_real_, longitude = NA_real_, start_date = NA, end_date = NA))
+  ssurgo_status <- reactiveVal("")
   irrig_version <- reactiveVal(0L)
   irrig_proxy <- dataTableProxy("irrig_table")
 
   output$openet_status <- renderText(openet_status())
+  output$ssurgo_status <- renderText(ssurgo_status())
 
   setup_values <- reactive({
     list(
@@ -286,6 +294,29 @@ server <- function(input, output, session) {
         })
       },
       error = function(e) openet_status(paste("OpenET API error:", conditionMessage(e)))
+    )
+  })
+
+  observeEvent(input$fetch_ssurgo, {
+    req(input$lat, input$lon)
+    ssurgo_status("Querying SSURGO...")
+    tryCatch(
+      {
+        soil <- fetch_ssurgo_soil_properties(
+          latitude = input$lat,
+          longitude = input$lon,
+          rooting_depth_ft = input$root_depth_ft %||% 4.0
+        )
+        updateNumericInput(session, "field_capacity", value = soil$field_capacity_in)
+        updateNumericInput(session, "pwp", value = soil$pwp_in)
+        ssurgo_status(sprintf(
+          "Soil series: %s (mukey %s)\nRoot zone: %.1f ft\nFC: %.2f in  |  PWP: %.2f in\nAWC: %.2f in  |  50%% MAD (ref): %.2f in\n\nField capacity and PWP updated.\nAllowable dryness and initial water content were NOT changed\u2014set those based on management and current field conditions.",
+          soil$compname, soil$mukey, soil$rooting_depth_ft,
+          soil$field_capacity_in, soil$pwp_in,
+          soil$awc_in, soil$allowable_dryness_in
+        ))
+      },
+      error = function(e) ssurgo_status(paste("SSURGO error:", conditionMessage(e)))
     )
   })
 
