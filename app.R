@@ -147,7 +147,16 @@ body { background-color: #f5f7fb; }
 
 ui <- fluidPage(
   tags$head(tags$style(HTML(app_css))),
-  titlePanel("OpenET irrigation water balance dashboard"),
+  tags$div(
+    style = "position: fixed; top: 12px; right: 18px; z-index: 9999;",
+    actionButton("show_help",
+      label = "?", title = "How to use this app",
+      style = "border-radius: 50%; width: 34px; height: 34px; padding: 0;
+               font-weight: 700; font-size: 16px;
+               background-color: #2e86c1; color: #fff; border: none;
+               box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer;"
+    )
+  ),
   sidebarLayout(
     sidebarPanel(
       textInput("field_id", "Field ID", default_setup$field_id),
@@ -248,31 +257,169 @@ ui <- fluidPage(
         tabPanel(
           "FAQ",
           br(),
+          h2("OpenET Irrigation Water Balance Dashboard"),
+          p("A tool for estimating daily soil water balance and irrigation scheduling using satellite-based evapotranspiration from OpenET."),
+          hr(),
           h4("Frequently Asked Questions"),
           hr(),
-          h5("What is OpenET?"),
-          p("OpenET uses satellite-based evapotranspiration (ET) data to provide daily, field-scale ET estimates across the western United States."),
-          p(a("Visit the OpenET website", href = "https://openetdata.org", target = "_blank")),
-          hr(),
-          h5("What models does OpenET provide?"),
-          p(
-            "OpenET includes six ET models — GEESEBAL, SSEBOP, SIMS, DISALEXI, PT-JPL, and eeMETRIC — as well as an ensemble mean. See the",
-            a("OpenET documentation", href = "https://etdata.org/methods/", target = "_blank"),
-            "for details on each model."
-          ),
-          hr(),
-          h5("Where do I get an OpenET API key?"),
-          p(
-            "Register for an API key at the",
-            a("OpenET account portal", href = "https://etdata.org/api/", target = "_blank"), "."
-          ),
-          hr(),
-          h5("What is SSURGO?"),
-          p("SSURGO (Soil Survey Geographic Database) is USDA's most detailed soil survey database. It provides soil properties such as field capacity and wilting point at the survey map unit level."),
-          p(a("Explore SSURGO data on the Web Soil Survey", href = "https://websoilsurvey.nrcs.usda.gov", target = "_blank")),
-          hr(),
-          h5("How is the soil water balance calculated?"),
-          p("The balance tracks daily soil water content using: Soil Water = Previous Soil Water + Irrigation + Effective Precipitation − ETa. An irrigation event is suggested when soil water drops below the allowable dryness threshold.")
+          tags$div(
+            class = "panel-group", id = "faq-accordion",
+            # Q1
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq1",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "What is OpenET?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq1", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p("OpenET uses satellite-based evapotranspiration (ET) data to provide daily, field-scale ET estimates across the western United States."),
+                  p(a("Visit the OpenET website", href = "https://openetdata.org", target = "_blank"))
+                )
+              )
+            ),
+            # Q2
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq2",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "What models does OpenET provide?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq2", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p(
+                    "OpenET includes six ET models — GEESEBAL, SSEBOP, SIMS, DISALEXI, PT-JPL, and eeMETRIC — as well as an ensemble mean. See the",
+                    a("OpenET documentation", href = "https://etdata.org/methods/", target = "_blank"),
+                    "for details on each model."
+                  )
+                )
+              )
+            ),
+            # Q3
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq3",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "Where do I get an OpenET API key?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq3", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p(
+                    "Register for an API key at the",
+                    a("OpenET account portal", href = "https://etdata.org/api/", target = "_blank"), "."
+                  )
+                )
+              )
+            ),
+            # Q4
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq4",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "What is SSURGO?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq4", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p("SSURGO (Soil Survey Geographic Database) is USDA's most detailed soil survey database. It provides soil properties such as field capacity and wilting point at the survey map unit level."),
+                  p(a("Explore SSURGO data on the Web Soil Survey", href = "https://websoilsurvey.nrcs.usda.gov", target = "_blank"))
+                )
+              )
+            ),
+            # Q5
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq5",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "How are field capacity and permanent wilting point calculated from SSURGO?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq5", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p("When you click ", tags$b("Fetch Soil from SSURGO"), ", the app queries the dominant soil component at your coordinates and retrieves horizon-level data down to your specified root zone depth. The following steps are applied:"),
+                  tags$ol(
+                    tags$li(tags$b("Horizon clipping:"), " Only horizons within the root zone depth are used. The bottom of the deepest horizon is clipped to the root zone depth."),
+                    tags$li(tags$b("Gravimetric to volumetric conversion:"), " SSURGO reports moisture at field capacity (1/3 bar, ", tags$code("wthirdbar_r"), ") and permanent wilting point (15 bar, ", tags$code("wfifteenbar_r"), ") as % by weight. These are converted to volumetric fractions (cm³ water / cm³ soil) by multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³)."),
+                    tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons within the root zone."),
+                    tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
+                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed deficit (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity.")
+                  ),
+                  p(tags$em("Note: AWC (", tags$code("awc_r"), ") is already reported as a volumetric fraction (cm/cm) in SSURGO and is used directly."), style = "font-size: 12px; color: #667085;")
+                )
+              )
+            ),
+            # Q7
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq7",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "How is the soil water balance calculated?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq7", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p("The balance tracks daily soil water content using: Soil Water = Previous Soil Water + Irrigation + Effective Precipitation − ETa. An irrigation event is suggested when soil water drops below the allowable dryness threshold.")
+                )
+              )
+            )
+          )
         )
       )
     )
@@ -280,6 +427,43 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  showModal(modalDialog(
+    title = tags$div(
+      tags$img(
+        src = "https://openetdata.org/static/images/openet-logo.png",
+        height = "36px", style = "margin-right: 10px; vertical-align: middle;"
+      ),
+      tags$span("Welcome to the OpenET Irrigation Water Balance Dashboard",
+        style = "vertical-align: middle; font-size: 18px; font-weight: 600;"
+      )
+    ),
+    tags$div(
+      p(
+        "This tool estimates daily soil water balance and irrigation scheduling using satellite-based evapotranspiration (ET) data from ",
+        a("OpenET", href = "https://openetdata.org", target = "_blank"), "."
+      ),
+      hr(),
+      h5("Getting started:"),
+      tags$ol(
+        tags$li(
+          tags$b("Create a free OpenET account"), " and generate an API key at ",
+          a("etdata.org", href = "https://etdata.org", target = "_blank"), "."
+        ),
+        tags$li("Enter your ", tags$b("Field ID"), ", ", tags$b("Crop"), ", ", tags$b("Date range"), ", and ", tags$b("Coordinates"), " in the left panel."),
+        tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
+        tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
+        tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), ".")
+      ),
+      hr(),
+      p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
+        style = "color: #667085; font-size: 13px;"
+      )
+    ),
+    footer = modalButton("Get started"),
+    size = "l",
+    easyClose = TRUE
+  ))
+
   irrigation_data <- reactiveVal(make_default_irrigation_range(default_start, default_end))
   openet_data <- reactiveVal(make_empty_openet_range(default_start, default_end))
   openet_status <- reactiveVal("No OpenET API request made yet.")
@@ -323,6 +507,45 @@ server <- function(input, output, session) {
     },
     ignoreInit = TRUE
   )
+
+  observeEvent(input$show_help, {
+    showModal(modalDialog(
+      title = tags$div(
+        tags$img(
+          src = "https://openetdata.org/static/images/openet-logo.png",
+          height = "36px", style = "margin-right: 10px; vertical-align: middle;"
+        ),
+        tags$span("Welcome to the OpenET Irrigation Water Balance Dashboard",
+          style = "vertical-align: middle; font-size: 18px; font-weight: 600;"
+        )
+      ),
+      tags$div(
+        p(
+          "This tool estimates daily soil water balance and irrigation scheduling using satellite-based evapotranspiration (ET) data from ",
+          a("OpenET", href = "https://openetdata.org", target = "_blank"), "."
+        ),
+        hr(),
+        h5("Getting started:"),
+        tags$ol(
+          tags$li(
+            tags$b("Create a free OpenET account"), " and generate an API key at ",
+            a("etdata.org", href = "https://etdata.org", target = "_blank"), "."
+          ),
+          tags$li("Enter your ", tags$b("Field ID"), ", ", tags$b("Crop"), ", ", tags$b("Date range"), ", and ", tags$b("Coordinates"), " in the left panel."),
+          tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
+          tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
+          tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), ".")
+        ),
+        hr(),
+        p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
+          style = "color: #667085; font-size: 13px;"
+        )
+      ),
+      footer = modalButton("Get started"),
+      size = "l",
+      easyClose = TRUE
+    ))
+  })
 
   observeEvent(input$fetch_openet, {
     req(input$api_key, input$date_range, input$lat, input$lon)
