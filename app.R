@@ -222,9 +222,8 @@ ui <- fluidPage(
         tags$summary(tags$b("OpenET")),
         br(),
         passwordInput("api_key", "OpenET API key", default_setup$api_key),
-        selectInput("openet_model", "Model", choices = models, selected = default_setup$selected_model),
+        selectInput("openet_model", "ET Model", choices = models, selected = default_setup$selected_model),
         checkboxInput("download_all_models", "Download all ET models", default_setup$download_all_models),
-        checkboxInput("download_eto", "Download reference ET (ETo)", FALSE),
         actionButton("fetch_openet", "Update OpenET data", class = "btn-primary"),
         br(), br(),
         verbatimTextOutput("openet_status")
@@ -365,8 +364,12 @@ ui <- fluidPage(
                 id = "faq0b", class = "panel-collapse collapse",
                 tags$div(
                   class = "panel-body",
-                  p("Precipitation data used in this app comes from ", tags$b("gridMET"), ", a gridded surface meteorological dataset that provides daily climate data at ~4 km spatial resolution across the contiguous United States."),
-                  p("gridMET precipitation is one of the reference and ancillary datasets used by OpenET to support ET model calculations and water balance estimates."),
+                  p("Both precipitation and reference ET (ETo) used in this app come from ", a(tags$b("gridMET"), href = "https://www.climatologylab.org/gridmet.html", target = "_blank"), ", a gridded surface meteorological dataset that provides daily climate data at ~4 km spatial resolution across the contiguous United States."),
+                  tags$ul(
+                    tags$li(tags$b("Precipitation (PPT):"), " Daily gridded precipitation from gridMET is used directly in the soil water balance to account for rainfall inputs."),
+                    tags$li(tags$b("Reference ET (ETo):"), " Grass reference ET is bias-corrected using nearly 800 quality-controlled weather stations in agricultural areas to account for local differences in wind speed, humidity, solar radiation, and temperature. In California, Spatial CIMIS data from the California Department of Water Resources is used instead of gridMET for reference ET.")
+                  ),
+                  p(a("gridMET", href = "https://www.climatologylab.org/gridmet.html", target = "_blank"), " precipitation and ETo are part of the reference and ancillary datasets that OpenET uses to support ET model calculations and water balance estimates."),
                   p(a("See OpenET reference & ancillary data methods", href = "https://etdata.org/methods/", target = "_blank"))
                 )
               )
@@ -391,6 +394,7 @@ ui <- fluidPage(
                 tags$div(
                   class = "panel-body",
                   p("OpenET uses satellite-based evapotranspiration (ET) data to provide daily, field-scale ET estimates across the western United States."),
+                  p("It combines six independent, peer-reviewed ET models plus an ensemble mean to improve accuracy and reliability. By drawing on satellite imagery, weather data, and land surface information, OpenET delivers consistent ET estimates at the field scale — making it practical for irrigation scheduling, water accounting, and agricultural water management."),
                   p(a("Visit the OpenET website", href = "https://openetdata.org", target = "_blank"))
                 )
               )
@@ -418,7 +422,18 @@ ui <- fluidPage(
                     "OpenET includes six ET models — GEESEBAL, SSEBOP, SIMS, DISALEXI, PT-JPL, and eeMETRIC — as well as an ensemble mean. See the",
                     a("OpenET documentation", href = "https://etdata.org/methods/", target = "_blank"),
                     "for details on each model."
-                  )
+                  ),
+                  p(
+                    tags$b("The ensemble mean is a good first choice."),
+                    " It combines all six models and has proven to be the most consistently accurate option for croplands. Individual models may outperform the ensemble for specific crops or regions, but the ensemble is the recommended starting point before evaluating model-specific performance for your field."
+                  ),
+                  p(tags$b("Ensemble accuracy for croplands (across validation sites):")),
+                  tags$ul(
+                    tags$li(tags$b("Growing season:"), " R² = 0.96, bias = −2.0% (39 sites, 177 growing seasons)"),
+                    tags$li(tags$b("Monthly:"), " R² = 0.92, bias = −5.8% (46 sites, 1,791 months)"),
+                    tags$li(tags$b("Daily:"), " R² = 0.86, bias = −10.0% (55 sites, 5,508 Landsat overpass days)")
+                  ),
+                  p(a("See full OpenET accuracy details", href = "https://etdata.org/accuracy-known-issues/", target = "_blank"))
                 )
               )
             ),
@@ -441,10 +456,18 @@ ui <- fluidPage(
                 id = "faq3", class = "panel-collapse collapse",
                 tags$div(
                   class = "panel-body",
-                  p(
-                    "Register for an API key at the",
-                    a("OpenET account portal", href = "https://etdata.org/api/", target = "_blank"), "."
-                  )
+                  p("Follow these steps to get your free OpenET API key:"),
+                  tags$ol(
+                    tags$li("Go to ", a("etdata.org", href = "https://etdata.org", target = "_blank"), " and click ", tags$b("Sign Up"), " to create a free account."),
+                    tags$li("Once logged in, navigate to your ", tags$b("Account"), " page and find the ", tags$b("API Key"), " section."),
+                    tags$li("Click ", tags$b("Generate API Key"), " (or copy your existing key if one has already been created)."),
+                    tags$li("Paste the key into the ", tags$b("OpenET API key"), " field in the OpenET section of this app's left panel."),
+                    tags$li("Click ", tags$b("Update OpenET data"), " to fetch ET and precipitation data for your field.")
+                  ),
+                  p(tags$em("Note: API keys are free for individual users. Keep your key private — do not share it publicly."),
+                    style = "font-size: 12px; color: #667085;"
+                  ),
+                  p(a("Go to the OpenET account portal", href = "https://etdata.org/api/", target = "_blank"))
                 )
               )
             ),
@@ -699,7 +722,7 @@ server <- function(input, output, session) {
         end_date <- as.Date(input$date_range[2])
         fetch_models <- if (isTRUE(input$download_all_models)) models else input$openet_model
         if (!"ENSEMBLE" %in% fetch_models) fetch_models <- unique(c(fetch_models, "ENSEMBLE"))
-        n_calls <- length(fetch_models) + 1 + isTRUE(input$download_eto)
+        n_calls <- length(fetch_models) + 1 + 1L
         withProgress(message = "Fetching OpenET data", detail = "This may take 1\u20133 min per request\u2026", value = 0, {
           et_list <- list()
           for (i in seq_along(fetch_models)) {
@@ -708,7 +731,7 @@ server <- function(input, output, session) {
           }
           incProgress(0.12, detail = "Fetching precipitation \u2014 please wait\u2026")
           pr <- fetch_openet_point(input$api_key, input$lon, input$lat, start_date, end_date, model = "ENSEMBLE", variable = "PR")
-          if (isTRUE(input$download_eto)) {
+          {
             incProgress(0.08, detail = "Fetching reference ET (ETo) \u2014 please wait\u2026")
             eto_result <- tryCatch(
               fetch_openet_point(input$api_key, input$lon, input$lat, start_date, end_date, model = "ENSEMBLE", variable = "ETO"),
@@ -718,8 +741,6 @@ server <- function(input, output, session) {
               }
             )
             eto_data(eto_result)
-          } else {
-            eto_data(NULL)
           }
           out <- combine_openet_models(et_list, pr, start_date, end_date)
           openet_data(out)
@@ -1035,7 +1056,7 @@ server <- function(input, output, session) {
 
   # ── Save session ──────────────────────────────────────────────────────────
   output$save_session <- downloadHandler(
-    filename = function() paste0("session_", input$field_id, "_", Sys.Date(), ".rds"),
+    filename = function() paste0("session_", input$field_id, "_", format(Sys.time(), "%m_%d_%Y_%H%M"), ".rds"),
     content = function(file) {
       session_data <- list(
         version = 1L,
@@ -1054,7 +1075,6 @@ server <- function(input, output, session) {
           root_depth_ft = input$root_depth_ft,
           openet_model = input$openet_model,
           download_all_models = input$download_all_models,
-          download_eto = input$download_eto,
           count_precip_effective = input$count_precip_effective
         ),
         irrigation_data = irrigation_data(),
@@ -1098,7 +1118,6 @@ server <- function(input, output, session) {
         updateNumericInput(session, "root_depth_ft", value = s$root_depth_ft %||% 4.0)
         updateSelectInput(session, "openet_model", selected = s$openet_model)
         updateCheckboxInput(session, "download_all_models", value = isTRUE(s$download_all_models))
-        updateCheckboxInput(session, "download_eto", value = isTRUE(s$download_eto))
         updateCheckboxInput(session, "count_precip_effective", value = isTRUE(s$count_precip_effective))
         irrigation_data(sd$irrigation_data)
         openet_data(sd$openet_data)
