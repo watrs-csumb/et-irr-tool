@@ -650,7 +650,7 @@ server <- function(input, output, session) {
         tags$li("Use ", tags$b("Download Excel Results"), " in the ", tags$b("Calcs"), " tab to export the full daily water balance table.")
       ),
       hr(),
-      p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
+      p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging. Click on the legend to toggle individual variables on and off."),
         style = "color: #667085; font-size: 13px;"
       )
     ),
@@ -775,7 +775,7 @@ server <- function(input, output, session) {
           tags$li("Use ", tags$b("Download Excel Results"), " in the ", tags$b("Calcs"), " tab to export the full daily water balance table.")
         ),
         hr(),
-        p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
+        p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging. Click on the legend to toggle individual variables on and off."),
           style = "color: #667085; font-size: 13px;"
         )
       ),
