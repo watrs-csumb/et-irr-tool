@@ -187,7 +187,7 @@ fetch_openet_point <- function(api_key, longitude, latitude, start_date, end_dat
     httr2::req_method("POST") |>
     httr2::req_headers(accept = "text/csv, application/json", Authorization = api_key, `Content-Type` = "application/json") |>
     httr2::req_body_json(payload, auto_unbox = TRUE) |>
-    httr2::req_timeout(120) |>
+    httr2::req_timeout(300) |>
     httr2::req_perform()
   body_text <- httr2::resp_body_string(response)
   status <- httr2::resp_status(response)
