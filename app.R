@@ -14,8 +14,8 @@ library(shinycssloaders)
 source("R/openet_utils.R")
 
 models <- c("GEESEBAL", "SSEBOP", "SIMS", "DISALEXI", "PTJPL", "EEMETRIC", "ENSEMBLE")
-default_start <- as.Date("2026-01-01")
-default_end <- as.Date("2026-05-31")
+default_start <- as.Date(format(Sys.Date(), "%Y-01-01"))
+default_end <- Sys.Date()
 
 default_setup <- list(
   field_id = "Example",
@@ -43,6 +43,7 @@ plotly_date_layout <- function(p) {
         type = "date",
         autorange = TRUE,
         tickmode = "auto",
+        title = "",
         hoverformat = "%b %d, %Y",
         showspikes = TRUE,
         spikemode = "across",
@@ -265,32 +266,6 @@ ui <- fluidPage(
           div(class = "wet-card", h4(textOutput("kc_title")), withSpinner(plotlyOutput("kc_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
         ),
         tabPanel(
-          "Scenario Explorer",
-          br(),
-          fluidRow(
-            column(3, div(class = "metric", div(class = "label", "Current Soil Water"), div(class = "value", textOutput("sc_cur_swc")))),
-            column(3, div(class = "metric", div(class = "label", "Available Before MAD"), div(class = "value", textOutput("sc_available")))),
-            column(3, div(class = "metric", div(class = "label", "Projected Daily ET"), div(class = "value", textOutput("sc_proj_et")))),
-            column(3, div(class = "metric", div(class = "label", "Days Until Irrigation"), div(class = "value", textOutput("sc_days_to_mad"))))
-          ),
-          br(),
-          div(
-            class = "wet-card",
-            h4("Forecast Inputs"),
-            p(class = "help-text", "Projected ET defaults to the 7-day average from your most recent data. Adjust it and add a planned irrigation amount to see how the soil water changes over time."),
-            fluidRow(
-              column(4, numericInput("scenario_et", "Projected daily ET, in./day", value = 0.15, min = 0, step = 0.01)),
-              column(4, numericInput("scenario_irrig", "Apply irrigation today, in.", value = 0, min = 0, step = 0.10)),
-              column(4, sliderInput("scenario_days", "Forecast horizon, days", min = 7, max = 90, value = 30, step = 1))
-            )
-          ),
-          div(
-            class = "wet-card",
-            h4("Soil Water Depletion Forecast"),
-            withSpinner(plotlyOutput("scenario_plot", height = 400), type = 6, color = "#2e86c1", size = 0.7)
-          )
-        ),
-        tabPanel(
           "Irrigation Amounts",
           br(),
           div(
@@ -307,6 +282,36 @@ ui <- fluidPage(
             actionButton("clear_irrig", "Clear applied water"),
             br(), br(),
             DTOutput("irrig_table")
+          )
+        ),
+        tabPanel(
+          "Irrigation Explorer",
+          br(),
+          fluidRow(
+            column(3, div(class = "metric", div(class = "label", "Current Soil Water"), div(class = "value", textOutput("sc_cur_swc")))),
+            column(3, div(class = "metric", div(class = "label", "Available Before MAD"), div(class = "value", textOutput("sc_available")))),
+            column(3, div(class = "metric", div(class = "label", "Projected Daily ET"), div(class = "value", textOutput("sc_proj_et")))),
+            column(3, div(class = "metric", div(class = "label", "Days Until Irrigation"), div(class = "value", textOutput("sc_days_to_mad"))))
+          ),
+          br(),
+          div(
+            class = "wet-card",
+            h4("Forecast Inputs"),
+            p(class = "help-text", "Projected ET defaults to the 7-day average from your most recent data. Adjust it and add a planned irrigation amount to see how the soil water changes over time."),
+            fluidRow(
+              column(
+                4,
+                numericInput("scenario_et", "Projected daily ET, in./day", value = 0.15, min = 0, step = 0.01),
+                actionButton("reset_scenario_et", "Reset to 7-day avg", class = "btn btn-default btn-xs", style = "margin-top: -4px;")
+              ),
+              column(4, numericInput("scenario_irrig", "Apply irrigation today, in.", value = 0, min = 0, step = 0.10)),
+              column(4, sliderInput("scenario_days", "Forecast horizon, days", min = 7, max = 30, value = 14, step = 1))
+            )
+          ),
+          div(
+            class = "wet-card",
+            h4("Soil Water Depletion Forecast"),
+            withSpinner(plotlyOutput("scenario_plot", height = 400), type = 6, color = "#2e86c1", size = 0.7)
           )
         ),
         tabPanel(
@@ -639,7 +644,8 @@ server <- function(input, output, session) {
         tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
         tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
         tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
-        tags$li("Use ", tags$b("Save Session"), " in the Session panel to save your setup and data to a file. Reload it any time with ", tags$b("Load Session"), ".")
+        tags$li("Use ", tags$b("Save Session"), " in the Session panel to save your setup and data to a file. Reload it any time with ", tags$b("Load Session"), "."),
+        tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due.")
       ),
       hr(),
       p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
@@ -761,7 +767,8 @@ server <- function(input, output, session) {
           tags$li("Enter your", tags$b("Field ID"), ",", tags$b("Crop"), ",", tags$b("Date range"), ", and", tags$b("Coordinates"), " in the left panel."),
           tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
           tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
-          tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), ".")
+          tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
+          tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due.")
         ),
         hr(),
         p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
@@ -966,10 +973,10 @@ server <- function(input, output, session) {
   output$m_precip <- renderText(sprintf("%.2f", metrics()$total_precip))
   output$m_deep <- renderText(sprintf("%.2f", metrics()$total_deep_perc))
 
-  output$soil_title <- renderText(sprintf("Soil Water Content, in. for %s @ %s", input$crop, input$field_id))
-  output$eta_title <- renderText(sprintf("Σ Evapotranspiration, in., for %s @ %s %s", input$crop, input$field_id, format(as.Date(input$date_range[1]), "%Y")))
-  output$deep_title <- renderText(sprintf("Σ Deep Percolation & Leaching Fraction for %s @ %s %s", input$crop, input$field_id, format(as.Date(input$date_range[1]), "%Y")))
-  output$kc_title <- renderText(sprintf("Daily ET, ETo & ET/ETo for %s @ %s", input$crop, input$field_id))
+  output$soil_title <- renderText(sprintf("Soil Water Content — %s @ %s", input$crop, input$field_id))
+  output$eta_title <- renderText(sprintf("Cumulative ET & Applied Water — %s @ %s", input$crop, input$field_id))
+  output$deep_title <- renderText(sprintf("Deep Percolation & Leaching Fraction — %s @ %s", input$crop, input$field_id))
+  output$kc_title <- renderText(sprintf("Daily ET, ETo & ET/ETo — %s @ %s", input$crop, input$field_id))
 
   output$location_warning <- renderUI({
     loc <- openet_location()
@@ -1009,7 +1016,7 @@ server <- function(input, output, session) {
     )
     p <- p +
       scale_color_manual(values = color_vals) +
-      labs(x = NULL, y = "Cumulative Water, in.", color = NULL) +
+      labs(x = NULL, y = "Cumulative Water (in.)", color = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
     plotly_date_layout(clean_plotly_hover(ggplotly(p)))
@@ -1022,7 +1029,7 @@ server <- function(input, output, session) {
       geom_ribbon(aes(ymin = permanent_wilting_point_in, ymax = allowable_dryness_in),
         fill = "#FFCDD2", alpha = 0.30, color = NA
       ) +
-      geom_col(aes(y = precip_plot_in, fill = "Precipitation, in."), alpha = 0.55, na.rm = TRUE) +
+      geom_point(aes(y = precip_plot_in, color = "Precipitation, in."), shape = 21, size = 3, fill = "#90CAF9", alpha = 0.85, na.rm = TRUE) +
       geom_point(aes(y = applied_plot_in, color = "Applied Water Event, in."), size = 3, shape = 24, na.rm = TRUE) +
       geom_line(aes(y = field_capacity_in, color = "Field Capacity, in."), linetype = "dashed", linewidth = 0.8) +
       geom_line(aes(y = allowable_dryness_in, color = "Allowable Dryness, in."), linetype = "dashed", linewidth = 0.8) +
@@ -1033,10 +1040,10 @@ server <- function(input, output, session) {
         "Field Capacity, in." = "#2E7D32",
         "Allowable Dryness, in." = "#F57F17",
         "Perm. Wilting Point, in." = "#C62828",
-        "Applied Water Event, in." = "#0288D1"
+        "Applied Water Event, in." = "#0288D1",
+        "Precipitation, in." = "#42A5F5"
       )) +
-      scale_fill_manual(values = c("Precipitation, in." = "#90CAF9")) +
-      labs(x = NULL, y = "Soil Water, in.", color = NULL, fill = NULL) +
+      labs(x = NULL, y = "Soil Water (in.)", color = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
     plotly_date_layout(clean_plotly_hover(ggplotly(p)))
@@ -1068,6 +1075,7 @@ server <- function(input, output, session) {
         hovermode = "x unified",
         xaxis = list(
           type = "date", autorange = TRUE, tickmode = "auto",
+          title = "",
           hoverformat = "%b %d, %Y",
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
@@ -1108,7 +1116,7 @@ server <- function(input, output, session) {
 
     plot_ly(df, x = ~date) |>
       add_lines(
-        y = ~eta_in, name = "Daily ETa, in.",
+        y = ~eta_in, name = "Daily ET, in.",
         line = list(color = "#C62828", width = 2),
         hovertemplate = "ETa: %{y:.2f} in.<extra></extra>",
         yaxis = "y"
@@ -1130,11 +1138,12 @@ server <- function(input, output, session) {
         hovermode = "x unified",
         xaxis = list(
           type = "date", autorange = TRUE, tickmode = "auto",
+          title = "",
           hoverformat = "%b %d, %Y",
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
         yaxis = list(
-          title = "Daily Water Depth, in.",
+          title = "Inches",
           tickmode = "auto", nticks = 10,
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
@@ -1324,7 +1333,7 @@ server <- function(input, output, session) {
       }
     )
   })
-  # ── Scenario Explorer ──────────────────────────────────────────────────────
+  # ── Irrigation Explorer ──────────────────────────────────────────────────────
   scenario_base <- reactive({
     bal <- balance()
     validate(need(nrow(bal) > 0, "Run the water balance first (fetch OpenET data)."))
@@ -1335,45 +1344,55 @@ server <- function(input, output, session) {
       cur_swc   = last$soil_water_content_in,
       fc        = last$field_capacity_in,
       mad       = last$allowable_dryness_in,
+      pwp       = last$permanent_wilting_point_in,
       last_date = as.Date(last$date),
       avg_et    = avg_et
     )
   })
 
-  observeEvent(scenario_base(), {
+  observeEvent(scenario_base(),
+    {
+      updateNumericInput(session, "scenario_et", value = scenario_base()$avg_et)
+    },
+    ignoreInit = FALSE,
+    ignoreNULL = TRUE
+  )
+
+  observeEvent(input$reset_scenario_et, {
     updateNumericInput(session, "scenario_et", value = scenario_base()$avg_et)
-  }, ignoreInit = FALSE, ignoreNULL = TRUE)
+  })
 
   scenario_forecast <- reactive({
-    d        <- scenario_base()
-    n_days   <- as.integer(input$scenario_days)
-    proj_et  <- max(0, input$scenario_et %||% 0)
+    d <- scenario_base()
+    n_days <- as.integer(input$scenario_days)
+    proj_et <- max(0, input$scenario_et %||% 0)
     irrig_in <- max(0, input$scenario_irrig %||% 0)
-    dates    <- seq(d$last_date + 1L, by = "day", length.out = n_days)
-    swc_no   <- numeric(n_days)
+    dates <- seq(d$last_date + 1L, by = "day", length.out = n_days)
+    swc_no <- numeric(n_days)
     swc_with <- numeric(n_days)
-    prev_no   <- d$cur_swc
+    prev_no <- d$cur_swc
     prev_with <- min(d$fc, d$cur_swc + irrig_in)
     for (i in seq_len(n_days)) {
-      prev_no   <- max(0, prev_no   - proj_et)
+      prev_no <- max(0, prev_no - proj_et)
       prev_with <- max(0, prev_with - proj_et)
-      swc_no[i]   <- prev_no
+      swc_no[i] <- prev_no
       swc_with[i] <- prev_with
     }
     idx <- which(swc_no <= d$mad)
     days_to_mad <- if (length(idx)) idx[1] else NA_integer_
     list(
       df = data.frame(
-        date     = dates,
-        swc_no   = swc_no,
+        date = dates,
+        swc_no = swc_no,
         swc_with = if (irrig_in > 0) swc_with else rep(NA_real_, n_days),
         stringsAsFactors = FALSE
       ),
-      fc          = d$fc,
-      mad         = d$mad,
+      fc = d$fc,
+      mad = d$mad,
+      pwp = d$pwp,
       days_to_mad = days_to_mad,
-      irrig_in    = irrig_in,
-      last_date   = d$last_date
+      irrig_in = irrig_in,
+      last_date = d$last_date
     )
   })
 
@@ -1385,7 +1404,7 @@ server <- function(input, output, session) {
     sprintf("%.2f in.", max(0, d$cur_swc - d$mad))
   })
   output$sc_proj_et <- renderText({
-    sprintf("%.3f in./day", max(0, input$scenario_et %||% 0))
+    sprintf("%.2f in./day", max(0, input$scenario_et %||% 0))
   })
   output$sc_days_to_mad <- renderText({
     sc <- scenario_forecast()
@@ -1393,7 +1412,7 @@ server <- function(input, output, session) {
       paste0("> ", input$scenario_days, " days")
     } else {
       irrig_date <- sc$last_date + sc$days_to_mad
-      paste0(sc$days_to_mad, " days (", format(irrig_date, "%b %d, %Y"), ")")
+      paste0(sc$days_to_mad, " days (", format(irrig_date, "%m/%d/%y"), ")")
     }
   })
 
@@ -1403,34 +1422,39 @@ server <- function(input, output, session) {
     p <- plot_ly(df, x = ~date) |>
       add_lines(
         y = ~swc_no, name = "Projected SWC (no irrigation)",
-        line = list(color = "#1565C0", width = 2.5),
+        line = list(color = "#1565C0", width = 4),
         hovertemplate = "SWC: %{y:.2f} in.<extra></extra>"
       )
     if (sc$irrig_in > 0) {
       p <- p |> add_lines(
         y = ~swc_with,
-        name = paste0("SWC w/ ", round(sc$irrig_in, 2), " in. irrigation"),
-        line = list(color = "#2E7D32", width = 2.5, dash = "dash"),
+        name = paste0("SWC w/", round(sc$irrig_in, 2), " in. irrigation"),
+        line = list(color = "#1565C0", width = 4, dash = "dot"),
         hovertemplate = "SWC w/ irrigation: %{y:.2f} in.<extra></extra>"
       )
     }
     p <- p |>
       add_lines(
         x = ~date, y = rep(sc$fc, nrow(df)), name = "Field Capacity",
-        line = list(color = "#388E3C", width = 1.5, dash = "dot"),
+        line = list(color = "#388E3C", width = 4, dash = "dash"),
         hovertemplate = paste0("Field Capacity: ", round(sc$fc, 2), " in.<extra></extra>")
       ) |>
       add_lines(
         x = ~date, y = rep(sc$mad, nrow(df)), name = "MAD Threshold",
-        line = list(color = "#C62828", width = 1.5, dash = "dot"),
+        line = list(color = "#ffa200", width = 4, dash = "dash"),
         hovertemplate = paste0("MAD: ", round(sc$mad, 2), " in.<extra></extra>")
+      ) |>
+      add_lines(
+        x = ~date, y = rep(sc$pwp, nrow(df)), name = "Perm. Wilting Point",
+        line = list(color = "#B71C1C", width = 4, dash = "dash"),
+        hovertemplate = paste0("Perm. Wilting Point: ", round(sc$pwp, 2), " in.<extra></extra>")
       )
     if (!is.na(sc$days_to_mad)) {
       irrig_date <- sc$last_date + sc$days_to_mad
       p <- p |> add_lines(
         x = c(irrig_date, irrig_date), y = c(0, sc$fc),
         name = paste0("Irrigate by ", format(irrig_date, "%b %d")),
-        line = list(color = "#E65100", width = 2, dash = "dashdot"),
+        line = list(color = "#828282", width = 3),
         hovertemplate = paste0("Irrigate by: ", format(irrig_date, "%b %d, %Y"), "<extra></extra>")
       )
     }
@@ -1438,16 +1462,16 @@ server <- function(input, output, session) {
       hovermode = "x unified",
       xaxis = list(
         type = "date", autorange = TRUE,
+        title = "",
         hoverformat = "%b %d, %Y",
         showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
       ),
-      yaxis = list(title = "Soil Water Content, in.", rangemode = "tozero"),
+      yaxis = list(title = "Soil Water Content (SWC), in.", rangemode = "tozero"),
       legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.10),
       font = list(size = 13),
       margin = list(r = 20)
     )
   })
-
 }
 
 shinyApp(ui, server)
