@@ -644,8 +644,9 @@ server <- function(input, output, session) {
         tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
         tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
         tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
-        tags$li("Use ", tags$b("Save Session"), " in the Session panel to save your setup and data to a file. Reload it any time with ", tags$b("Load Session"), "."),
-        tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due.")
+        tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due."),
+        tags$li("When done, open the ", tags$b("Session"), " panel and click ", tags$b("Save Session"), " to export your setup, irrigation entries, and ET data to a ", tags$code(".rds"), " file. Reload it any time with ", tags$b("Load Session"), " — no re-entry needed."),
+        tags$li("Use ", tags$b("Download Excel Results"), " in the ", tags$b("Calcs"), " tab to export the full daily water balance table.")
       ),
       hr(),
       p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
@@ -768,7 +769,9 @@ server <- function(input, output, session) {
           tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
           tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
           tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
-          tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due.")
+          tags$li("Open the ", tags$b("Irrigation Explorer"), " tab to project soil water depletion forward in time and find out when your next irrigation is due."),
+          tags$li("When done, open the ", tags$b("Session"), " panel and click ", tags$b("Save Session"), " to export your setup, irrigation entries, and ET data to a ", tags$code(".rds"), " file. Reload it any time with ", tags$b("Load Session"), " — no re-entry needed."),
+          tags$li("Use ", tags$b("Download Excel Results"), " in the ", tags$b("Calcs"), " tab to export the full daily water balance table.")
         ),
         hr(),
         p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
