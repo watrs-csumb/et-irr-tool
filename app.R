@@ -259,7 +259,6 @@ ui <- fluidPage(
           div(class = "wet-card", h4(textOutput("soil_title")), withSpinner(plotlyOutput("soil_plot", height = 380), type = 6, color = "#2e86c1", size = 0.7)),
           div(
             class = "wet-card", h4(textOutput("eta_title")),
-            checkboxInput("show_eto_plot", "Show reference ET (ETo)", FALSE),
             withSpinner(plotlyOutput("eta_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7)
           ),
           div(class = "wet-card", h4(textOutput("deep_title")), withSpinner(plotlyOutput("deep_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7)),
@@ -993,7 +992,7 @@ server <- function(input, output, session) {
 
   output$eta_plot <- renderPlotly({
     df <- make_excel_plot_balance(balance(), setup_values())
-    show_eto <- isTRUE(input$show_eto_plot) && !is.null(eto_data()) && nrow(eto_data()) > 0
+    show_eto <- !is.null(eto_data()) && nrow(eto_data()) > 0
     if (show_eto) {
       eto <- eto_data()
       eto$date <- as.Date(eto$date)
@@ -1257,6 +1256,7 @@ server <- function(input, output, session) {
     content = function(file) write_balance_export(balance(), irrigation_data(), openet_data(), setup_values(), file)
   )
 
+  # ── Download metadata ─────────────────────────────────────────────────────
   # ── Save session ──────────────────────────────────────────────────────────
   output$save_session <- downloadHandler(
     filename = function() paste0("session_", input$field_id, "_", format(Sys.time(), "%m_%d_%Y_%H%M"), ".rds"),
