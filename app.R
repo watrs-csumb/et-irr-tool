@@ -297,7 +297,7 @@ ui <- fluidPage(
           div(
             class = "wet-card",
             h4("Forecast Inputs"),
-            p(class = "help-text", "Projected ET defaults to the 7-day average from your most recent data. Adjust it and add a planned irrigation amount to see how the soil water changes over time."),
+            p(class = "help-text", "Projected ET defaults to the 7-day average from your most recent data. The planning chart below shows soil water over your selected horizon."),
             fluidRow(
               column(
                 4,
@@ -310,9 +310,10 @@ ui <- fluidPage(
           ),
           div(
             class = "wet-card",
-            h4("Soil Water Depletion Forecast"),
+            h4("Soil Water Depletion — Planning View"),
             withSpinner(plotlyOutput("scenario_plot", height = 400), type = 6, color = "#2e86c1", size = 0.7)
-          )
+          ),
+          uiOutput("forecast_7day_card")
         ),
         tabPanel(
           "Calcs",
@@ -1362,6 +1363,51 @@ server <- function(input, output, session) {
     updateNumericInput(session, "scenario_et", value = scenario_base()$avg_et)
   })
 
+  # Open-Meteo 7-day ETo forecast — always fetches on lat/lon change.
+  eto_forecast <- reactive({
+    req(
+      is.numeric(input$lat), is.numeric(input$lon),
+      !is.na(input$lat), !is.na(input$lon)
+    )
+    tryCatch(
+      fetch_eto_forecast(input$lat, input$lon),
+      error = function(e) NULL
+    )
+  })
+
+  output$eto_forecast_status <- renderUI({
+    fc <- eto_forecast()
+    if (is.null(fc)) {
+      div(
+        style = "margin-top: 4px; color: #888; font-size: 0.85em;",
+        icon("exclamation-triangle"), " ETo forecast unavailable"
+      )
+    } else {
+      div(
+        style = "margin-top: 4px; color: #388E3C; font-size: 0.85em;",
+        icon("check-circle"),
+        sprintf(
+          " Open-Meteo ETo forecast loaded (%s \u2013 %s)",
+          format(min(fc$date), "%b %d"),
+          format(max(fc$date), "%b %d, %Y")
+        )
+      )
+    }
+  })
+
+  # Estimated Kc from OpenET data: mean(ETa) / mean(ETo) over last 7 non-zero days.
+  est_kc <- reactive({
+    bal <- balance()
+    eto <- eto_data()
+    req(nrow(bal) > 0, !is.null(eto), nrow(eto) > 0)
+    df <- merge(bal[bal$eta_in > 0, ], eto[, c("date", "eto_in")], by = "date", all.x = TRUE)
+    df <- tail(df[!is.na(df$eto_in) & df$eto_in > 0.001, ], 7)
+    if (nrow(df) == 0) {
+      return(NA_real_)
+    }
+    round(mean(df$eta_in / df$eto_in, na.rm = TRUE), 3)
+  })
+
   scenario_forecast <- reactive({
     d <- scenario_base()
     n_days <- as.integer(input$scenario_days)
@@ -1393,6 +1439,186 @@ server <- function(input, output, session) {
       days_to_mad = days_to_mad,
       irrig_in = irrig_in,
       last_date = d$last_date
+    )
+  })
+
+  # 7-day weather-based forecast using Open-Meteo ETo × Kc.
+  forecast_7day <- reactive({
+    fc_data <- eto_forecast()
+    req(!is.null(fc_data), nrow(fc_data) > 0)
+    d <- scenario_base()
+    irrig_in <- max(0, input$scenario_irrig %||% 0)
+    kc_val <- max(0.01, input$scenario_kc %||% 1)
+    dates <- fc_data$date
+    n <- nrow(fc_data)
+    swc <- numeric(n)
+    prev <- d$cur_swc
+    for (i in seq_len(n)) {
+      et_day <- max(0, kc_val * fc_data$eto_in[i])
+      prev <- max(0, prev - et_day)
+      swc[i] <- prev
+    }
+    idx <- which(swc <= d$mad)
+    list(
+      df = data.frame(
+        date = dates, swc = swc, eto_in = fc_data$eto_in,
+        et_est_in = round(kc_val * fc_data$eto_in, 4),
+        stringsAsFactors = FALSE
+      ),
+      fc = d$fc,
+      mad = d$mad,
+      pwp = d$pwp,
+      days_to_mad = if (length(idx)) idx[1] else NA_integer_,
+      last_date = d$last_date,
+      kc_used = kc_val
+    )
+  })
+
+  output$forecast_7day_card <- renderUI({
+    # Only show forecast if balance data ends within the last 7 days.
+    base <- tryCatch(scenario_base(), error = function(e) NULL)
+    if (is.null(base)) {
+      return(NULL)
+    }
+    days_stale <- as.integer(Sys.Date() - base$last_date)
+    if (days_stale > 7) {
+      return(div(
+        class = "wet-card",
+        h4("Soil Water Depletion and ET using 7-Day ETo Forecast"),
+        p(
+          class = "help-text", style = "color: #888;",
+          icon("info-circle"),
+          sprintf(
+            " The 7-day ETo forecast is not shown because your data ends %d days ago (%s). Update your end date to today to enable the weather-based forecast.",
+            days_stale,
+            format(base$last_date, "%b %d, %Y")
+          )
+        )
+      ))
+    }
+    fc <- eto_forecast()
+    if (is.null(fc)) {
+      return(div(
+        class = "wet-card",
+        h4("7-Day ETo Forecast \u2014 Weather-Based View (Open-Meteo)"),
+        p(
+          class = "help-text", style = "color: #888;",
+          icon("exclamation-triangle"), " Open-Meteo forecast unavailable. Check your internet connection."
+        )
+      ))
+    }
+    kc_est_val <- tryCatch(est_kc(), error = function(e) NA_real_)
+    kc_default <- if (!is.na(kc_est_val)) kc_est_val else 1.0
+    div(
+      class = "wet-card",
+      h4("7-Day Soil Water Depletion & ET using ETo Forecast"),
+      uiOutput("eto_forecast_status"),
+      br(),
+      fluidRow(
+        column(
+          3,
+          numericInput("scenario_kc", "Crop coefficient (Kc)",
+            value = kc_default, min = 0.01, max = 3, step = 0.01
+          )
+        ),
+        column(
+          5,
+          br(),
+          actionButton("reset_kc", "Reset to 7-day avg (ETa/ETo)",
+            class = "btn btn-default btn-xs", style = "margin-top: 4px;"
+          )
+        )
+      ),
+      withSpinner(plotlyOutput("forecast_plot", height = 380), type = 6, color = "#F57C00", size = 0.7)
+    )
+  })
+
+  # Auto-seed Kc when OpenET data loads or changes.
+  observeEvent(est_kc(),
+    {
+      kc_est_val <- tryCatch(est_kc(), error = function(e) NA_real_)
+      if (!is.na(kc_est_val)) {
+        updateNumericInput(session, "scenario_kc", value = kc_est_val)
+      }
+    },
+    ignoreNULL = TRUE,
+    ignoreInit = FALSE
+  )
+
+  observeEvent(input$reset_kc, {
+    kc_est_val <- tryCatch(est_kc(), error = function(e) NA_real_)
+    if (!is.na(kc_est_val)) {
+      updateNumericInput(session, "scenario_kc", value = kc_est_val)
+    }
+  })
+
+  output$forecast_plot <- renderPlotly({
+    sc <- forecast_7day()
+    df <- sc$df
+    y2_max <- max(df$eto_in, na.rm = TRUE) * 2
+    p <- plot_ly(df, x = ~date) |>
+      add_bars(
+        y = ~eto_in, name = "Forecasted ETo",
+        yaxis = "y2", opacity = 0.30,
+        marker = list(color = "#F57C00", line = list(width = 0)),
+        hovertemplate = "ETo: %{y:.2f} in.<extra></extra>"
+      ) |>
+      add_bars(
+        y = ~et_est_in, name = "Est. Crop ET (Kc \u00d7 ETo)",
+        yaxis = "y2", opacity = 0.50,
+        marker = list(color = "#388E3C", line = list(width = 0)),
+        hovertemplate = "Est. ET: %{y:.2f} in.<extra></extra>"
+      ) |>
+      add_lines(
+        y = ~swc, name = "Forecast SWC",
+        line = list(color = "#1565C0", width = 4),
+        hovertemplate = "SWC: %{y:.2f} in.<extra></extra>"
+      ) |>
+      add_lines(
+        x = ~date, y = rep(sc$fc, nrow(df)), name = "Field Capacity",
+        line = list(color = "#388E3C", width = 3, dash = "dash"),
+        hovertemplate = paste0("Field Capacity: ", round(sc$fc, 2), " in.<extra></extra>")
+      ) |>
+      add_lines(
+        x = ~date, y = rep(sc$mad, nrow(df)), name = "MAD Threshold",
+        line = list(color = "#ffa200", width = 3, dash = "dash"),
+        hovertemplate = paste0("MAD: ", round(sc$mad, 2), " in.<extra></extra>")
+      ) |>
+      add_lines(
+        x = ~date, y = rep(sc$pwp, nrow(df)), name = "Perm. Wilting Point",
+        line = list(color = "#B71C1C", width = 3, dash = "dash"),
+        hovertemplate = paste0("Perm. Wilting Point: ", round(sc$pwp, 2), " in.<extra></extra>")
+      )
+    if (!is.na(sc$days_to_mad)) {
+      irrig_date <- sc$last_date + sc$days_to_mad
+      p <- p |> add_lines(
+        x = c(irrig_date, irrig_date), y = c(0, sc$fc),
+        name = paste0("Irrigate by ", format(irrig_date, "%b %d")),
+        line = list(color = "#828282", width = 3),
+        hovertemplate = paste0("Irrigate by: ", format(irrig_date, "%b %d, %Y"), "<extra></extra>")
+      )
+    }
+    y_max_fc <- sc$fc * 1.18
+    p |> layout(
+      hovermode = "x unified",
+      xaxis = list(
+        type = "date", autorange = TRUE, title = "",
+        hoverformat = "%b %d, %Y",
+        showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
+      ),
+      yaxis = list(
+        title = "Soil Water Content (SWC), in.",
+        range = c(-0.02 * sc$fc, y_max_fc),
+        zeroline = FALSE
+      ),
+      barmode = "overlay",
+      yaxis2 = list(
+        title = "Inches/day", overlaying = "y", side = "right",
+        range = c(0, y2_max), showgrid = FALSE
+      ),
+      legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.12),
+      font = list(size = 13),
+      margin = list(r = 60)
     )
   })
 
@@ -1458,6 +1684,7 @@ server <- function(input, output, session) {
         hovertemplate = paste0("Irrigate by: ", format(irrig_date, "%b %d, %Y"), "<extra></extra>")
       )
     }
+    y_max <- sc$fc * 1.18
     p |> layout(
       hovermode = "x unified",
       xaxis = list(
@@ -1466,7 +1693,11 @@ server <- function(input, output, session) {
         hoverformat = "%b %d, %Y",
         showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
       ),
-      yaxis = list(title = "Soil Water Content (SWC), in.", rangemode = "tozero"),
+      yaxis = list(
+        title = "Soil Water Content (SWC), in.",
+        range = c(-0.02 * sc$fc, y_max),
+        zeroline = FALSE
+      ),
       legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.10),
       font = list(size = 13),
       margin = list(r = 20)

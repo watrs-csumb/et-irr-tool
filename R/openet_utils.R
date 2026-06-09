@@ -543,3 +543,26 @@ write_balance_export <- function(balance, irrigation, openet, setup, path) {
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   path
 }
+
+# Fetch 7-day ETo forecast from Open-Meteo (free, no API key required).
+# Returns a data.frame with columns: date (Date), eto_in (numeric, inches/day).
+# On error returns NULL silently.
+fetch_eto_forecast <- function(lat, lon) {
+  url <- sprintf(
+    paste0(
+      "https://api.open-meteo.com/v1/forecast",
+      "?latitude=%.4f&longitude=%.4f",
+      "&daily=et0_fao_evapotranspiration&forecast_days=7&timezone=auto"
+    ),
+    lat, lon
+  )
+  resp <- httr2::request(url) |>
+    httr2::req_timeout(15) |>
+    httr2::req_perform()
+  body <- httr2::resp_body_json(resp, simplifyVector = TRUE)
+  data.frame(
+    date = as.Date(body$daily$time),
+    eto_in = round(body$daily$et0_fao_evapotranspiration / 25.4, 4),
+    stringsAsFactors = FALSE
+  )
+}
