@@ -3174,6 +3174,38 @@
         "RemoteSha": "0.57"
       }
     },
+    "xml2": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "xml2",
+        "Title": "Parse XML",
+        "Version": "1.5.2",
+        "Authors@R": "c(\n    person(\"Hadley\", \"Wickham\", role = \"aut\"),\n    person(\"Jim\", \"Hester\", role = \"aut\"),\n    person(\"Jeroen\", \"Ooms\", email = \"jeroenooms@gmail.com\", role = c(\"aut\", \"cre\")),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\")),\n    person(\"R Foundation\", role = \"ctb\",\n           comment = \"Copy of R-project homepage cached as example\")\n  )",
+        "Description": "Bindings to 'libxml2' for working with XML data using a simple, \n    consistent interface based on 'XPath' expressions. Also supports XML schema\n    validation; for 'XSLT' transformations see the 'xslt' package.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://xml2.r-lib.org, https://r-lib.r-universe.dev/xml2",
+        "BugReports": "https://github.com/r-lib/xml2/issues",
+        "Depends": "R (>= 3.6.0)",
+        "Imports": "cli, methods, rlang (>= 1.1.0)",
+        "Suggests": "covr, curl, httr, knitr, mockery, rmarkdown, testthat (>=\n3.2.0), xslt",
+        "VignetteBuilder": "knitr",
+        "Config/Needs/website": "tidyverse/tidytemplate",
+        "Encoding": "UTF-8",
+        "RoxygenNote": "7.3.3",
+        "SystemRequirements": "libxml2: libxml2-dev (deb), libxml2-devel (rpm)",
+        "Collate": "'S4.R' 'as_list.R' 'xml_parse.R' 'as_xml_document.R'\n'classes.R' 'format.R' 'import-standalone-obj-type.R'\n'import-standalone-purrr.R' 'import-standalone-types-check.R'\n'init.R' 'nodeset_apply.R' 'paths.R' 'utils.R' 'xml2-package.R'\n'xml_attr.R' 'xml_children.R' 'xml_document.R' 'xml_find.R'\n'xml_missing.R' 'xml_modify.R' 'xml_name.R' 'xml_namespaces.R'\n'xml_node.R' 'xml_nodeset.R' 'xml_path.R' 'xml_schema.R'\n'xml_serialize.R' 'xml_structure.R' 'xml_text.R' 'xml_type.R'\n'xml_url.R' 'xml_write.R' 'zzz.R'",
+        "Config/testthat/edition": "3",
+        "NeedsCompilation": "yes",
+        "Packaged": "2026-01-17 13:03:05 UTC; jeroen",
+        "Author": "Hadley Wickham [aut],\n  Jim Hester [aut],\n  Jeroen Ooms [aut, cre],\n  Posit Software, PBC [cph, fnd],\n  R Foundation [ctb] (Copy of R-project homepage cached as example)",
+        "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
+        "Repository": "CRAN",
+        "Date/Publication": "2026-01-17 16:10:02 UTC",
+        "Built": "R 4.5.2; aarch64-apple-darwin20; 2026-01-17 16:23:11 UTC; unix",
+        "Archs": "xml2.so.dSYM"
+      }
+    },
     "xtable": {
       "Source": "CRAN",
       "Repository": "https://cloud.r-project.org",
@@ -3252,11 +3284,8 @@
     }
   },
   "files": {
-    ".vscode/settings.json": {
-      "checksum": "20259971c3009f2ae2d630e0a8c33f87"
-    },
     "app.R": {
-      "checksum": "bf1d6b45da5b5f4506aeacf1338ebc8b"
+      "checksum": "69bf90b02056ecd1de5f7d2f2b9e41c1"
     },
     "OpenET_wETgraph_Version2025-8-07.xlsm": {
       "checksum": "d96d44d58640911899e5b28423292faf"
@@ -3266,6 +3295,9 @@
     },
     "README.md": {
       "checksum": "a14a33c5e400d9c7cecf7c1313f4954b"
+    },
+    "session_Example_06_09_2026_2155.rds": {
+      "checksum": "e1726e5ce2d1e290bb371e1d8c617978"
     }
   },
   "users": null
