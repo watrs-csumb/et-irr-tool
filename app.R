@@ -789,8 +789,8 @@ server <- function(input, output, session) {
       title = "Send Feedback",
       tags$div(
         p("Have a suggestion, found a bug, or want to share how you're using this tool? Fill out the form below."),
-        textInput("fb_name", "Your name", placeholder = "e.g. Jane Smith"),
-        textInput("fb_org", "Organization (optional)", placeholder = "e.g. USDA-NRCS"),
+        textInput("fb_name", "Your name", placeholder = "e.g. Desert Willow"),
+        textInput("fb_org", "Organization (optional)", placeholder = "e.g. North City Farm"),
         textInput("fb_subject", "Subject", placeholder = "e.g. Feature request"),
         textAreaInput("fb_message", "Message", rows = 5, placeholder = "Describe your suggestion or issue..."),
         uiOutput("fb_status")
