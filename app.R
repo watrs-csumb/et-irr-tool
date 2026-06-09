@@ -1613,7 +1613,7 @@ server <- function(input, output, session) {
       ),
       barmode = "overlay",
       yaxis2 = list(
-        title = "Inches/day", overlaying = "y", side = "right",
+        title = "Inches", overlaying = "y", side = "right",
         range = c(0, y2_max), showgrid = FALSE
       ),
       legend = list(orientation = "h", x = 0, xanchor = "left", y = 1.12),
