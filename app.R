@@ -8,6 +8,8 @@ library(plotly)
 library(leaflet)
 library(readxl)
 library(openxlsx)
+library(shinyFeedback)
+library(shinycssloaders)
 
 source("R/openet_utils.R")
 
@@ -90,6 +92,7 @@ clean_plotly_hover <- function(p) {
     format(d, "%b %d, %Y")
   }
 
+  date_shown <- FALSE
   for (i in seq_along(p$x$data)) {
     # ggplotly stores R Date as integer days since 1970-01-01, but plotly.js
     # expects milliseconds. Multiply by 86400000 to fix the "Dec 31, 1969" bug.
@@ -101,6 +104,20 @@ clean_plotly_hover <- function(p) {
       }
     }
 
+    # ribbon traces: ggplotly always sets showlegend=FALSE on geom_ribbon.
+    # Re-enable showlegend with a proper label; show name in hover but no value.
+    if (isFALSE(p$x$data[[i]]$showlegend) && identical(p$x$data[[i]]$fill, "toself")) {
+      p$x$data[[i]]$name <- "Undesired Dryness Zone"
+      p$x$data[[i]]$showlegend <- TRUE
+      p$x$data[[i]]$hovertemplate <- "Undesired Dryness Zone<extra></extra>"
+      next
+    }
+    # skip any other traces explicitly hidden (none currently, kept for safety)
+    if (isFALSE(p$x$data[[i]]$showlegend)) {
+      p$x$data[[i]]$hoverinfo <- "skip"
+      p$x$data[[i]]$hovertemplate <- "<extra></extra>"
+      next
+    }
     trace_name <- p$x$data[[i]]$name
     if (is.null(trace_name) || is.na(trace_name) || !nzchar(trace_name)) {
       trace_name <- "Value"
@@ -109,14 +126,19 @@ clean_plotly_hover <- function(p) {
     trace_name <- trimws(trace_name)
     trace_name <- gsub(",\\s*1$", "", trace_name)
     trace_name <- gsub("\\(([^)]+),\\s*1\\)", "(\\1)", trace_name)
+    trace_name <- gsub("^\\((.+)\\)$", "\\1", trace_name)
     p$x$data[[i]]$name <- trace_name
 
     date_labels <- format_trace_dates(p$x$data[[i]]$x)
-    if (!is.null(date_labels)) {
+    if (!date_shown && !is.null(date_labels)) {
       p$x$data[[i]]$customdata <- date_labels
-      date_line <- if (i == 1) "Date: %{customdata}<br>" else ""
+      date_line <- "Date: %{customdata}<br>"
+      date_shown <- TRUE
+    } else if (!date_shown) {
+      date_line <- "Date: %{x}<br>"
+      date_shown <- TRUE
     } else {
-      date_line <- if (i == 1) "Date: %{x}<br>" else ""
+      date_line <- ""
     }
 
     p$x$data[[i]]$hovertemplate <- paste0(date_line, trace_name, ": %{y:.2f}<extra></extra>")
@@ -143,10 +165,19 @@ body { background-color: #f5f7fb; }
 .well details { margin-bottom: 2px; }
 .well .btn-primary { background-color: #2e86c1; border-color: #2471a3; }
 .well .btn-info { background-color: #17a589; border-color: #148a72; }
+@media (max-width: 767px) {
+  .sidebar { margin-bottom: 16px; }
+  .wet-card { padding: 10px; }
+  .metric { min-height: auto; padding: 10px 12px; }
+  .metric .value { font-size: 22px; }
+  .navbar-fixed-top { position: relative; }
+}
+.shiny-notification { border-radius: 10px; }
 "
 
 ui <- fluidPage(
   tags$head(tags$style(HTML(app_css))),
+  useShinyFeedback(),
   tags$div(
     style = "position: fixed; top: 12px; right: 18px; z-index: 9999;",
     actionButton("show_help",
@@ -168,7 +199,6 @@ ui <- fluidPage(
       ),
       hr(),
       tags$details(
-        open = NA,
         tags$summary(tags$b("Soil Properties")),
         br(),
         numericInput("app_rate", "Net application rate, in/hr", default_setup$application_rate_in_hr, step = 0.0001),
@@ -180,7 +210,6 @@ ui <- fluidPage(
       ),
       hr(),
       tags$details(
-        open = NA,
         tags$summary(tags$b("SSURGO")),
         br(),
         numericInput("root_depth_ft", "Root zone depth, ft", value = 4.0, min = 1, max = 20, step = 0.5),
@@ -190,15 +219,28 @@ ui <- fluidPage(
       ),
       hr(),
       tags$details(
-        open = NA,
         tags$summary(tags$b("OpenET")),
         br(),
         passwordInput("api_key", "OpenET API key", default_setup$api_key),
         selectInput("openet_model", "Model", choices = models, selected = default_setup$selected_model),
         checkboxInput("download_all_models", "Download all ET models", default_setup$download_all_models),
+        checkboxInput("download_eto", "Download reference ET (ETo)", FALSE),
         actionButton("fetch_openet", "Update OpenET data", class = "btn-primary"),
         br(), br(),
         verbatimTextOutput("openet_status")
+      ),
+      hr(),
+      tags$details(
+        tags$summary(tags$b("Session")),
+        br(),
+        p(class = "help-text", "Save your current session (setup, irrigation entries, and ET data) to a file and reload it later."),
+        downloadButton("save_session", "Save Session", class = "btn-sm btn-default"),
+        br(), br(),
+        fileInput("load_session", "Load Session",
+          accept = ".rds",
+          placeholder = "Choose .rds file"
+        ),
+        uiOutput("session_status")
       )
     ),
     mainPanel(
@@ -214,9 +256,13 @@ ui <- fluidPage(
             column(3, div(class = "metric", div(class = "label", "Deep Percolation, in."), div(class = "value", textOutput("m_deep"))))
           ),
           br(),
-          div(class = "wet-card", h4(textOutput("soil_title")), plotlyOutput("soil_plot", height = 380)),
-          div(class = "wet-card", h4(textOutput("eta_title")), plotlyOutput("eta_plot", height = 330)),
-          div(class = "wet-card", h4(textOutput("deep_title")), plotlyOutput("deep_plot", height = 330))
+          div(class = "wet-card", h4(textOutput("soil_title")), withSpinner(plotlyOutput("soil_plot", height = 380), type = 6, color = "#2e86c1", size = 0.7)),
+          div(
+            class = "wet-card", h4(textOutput("eta_title")),
+            checkboxInput("show_eto_plot", "Show reference ET (ETo)", FALSE),
+            withSpinner(plotlyOutput("eta_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7)
+          ),
+          div(class = "wet-card", h4(textOutput("deep_title")), withSpinner(plotlyOutput("deep_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
         ),
         tabPanel(
           "Irrigation Amounts",
@@ -252,6 +298,13 @@ ui <- fluidPage(
         tabPanel(
           "Map",
           br(),
+          div(
+            style = "margin-bottom: 8px;",
+            radioButtons("map_style", NULL,
+              choices = c("Satellite" = "satellite", "Street Map" = "street"),
+              selected = "satellite", inline = TRUE
+            )
+          ),
           leafletOutput("field_map", height = 520)
         ),
         tabPanel(
@@ -264,6 +317,60 @@ ui <- fluidPage(
           hr(),
           tags$div(
             class = "panel-group", id = "faq-accordion",
+            # Q0 - What is ET?
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq0",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "What is ET?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq0", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p(tags$b("Evapotranspiration (ET)"), " is the combined process by which water is transferred from the land surface to the atmosphere through two pathways:"),
+                  tags$ul(
+                    tags$li(tags$b("Evaporation:"), " Water evaporates directly from soil, open water bodies, and other surfaces."),
+                    tags$li(tags$b("Transpiration:"), " Water is taken up by plant roots and released as vapor through tiny pores (stomata) in leaves and stems.")
+                  ),
+                  p("Together, ET is one of the largest components of the water cycle. Measuring ET accurately is essential for understanding crop water use, scheduling irrigation, and managing water resources."),
+                  p(a("Learn more about ET at etdata.org", href = "https://etdata.org/what-is-et/", target = "_blank"))
+                )
+              )
+            ),
+            # Q0b - Where does precipitation come from?
+            tags$div(
+              class = "panel panel-default",
+              tags$div(
+                class = "panel-heading",
+                tags$h5(
+                  class = "panel-title",
+                  tags$a(
+                    "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq0b",
+                    style = "text-decoration: none; color: inherit; display: block;",
+                    tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
+                    "Where does precipitation data come from?"
+                  )
+                )
+              ),
+              tags$div(
+                id = "faq0b", class = "panel-collapse collapse",
+                tags$div(
+                  class = "panel-body",
+                  p("Precipitation data used in this app comes from ", tags$b("gridMET"), ", a gridded surface meteorological dataset that provides daily climate data at ~4 km spatial resolution across the contiguous United States."),
+                  p("gridMET precipitation is one of the reference and ancillary datasets used by OpenET to support ET model calculations and water balance estimates."),
+                  p(a("See OpenET reference & ancillary data methods", href = "https://etdata.org/methods/", target = "_blank"))
+                )
+              )
+            ),
             # Q1
             tags$div(
               class = "panel panel-default",
@@ -425,7 +532,6 @@ ui <- fluidPage(
     )
   )
 )
-
 server <- function(input, output, session) {
   showModal(modalDialog(
     title = tags$div(
@@ -452,7 +558,8 @@ server <- function(input, output, session) {
         tags$li("Enter your ", tags$b("Field ID"), ", ", tags$b("Crop"), ", ", tags$b("Date range"), ", and ", tags$b("Coordinates"), " in the left panel."),
         tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location."),
         tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
-        tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), ".")
+        tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
+        tags$li("Use ", tags$b("Save Session"), " in the Session panel to save your setup and data to a file. Reload it any time with ", tags$b("Load Session"), ".")
       ),
       hr(),
       p(tags$em("Tip: Hover over any chart to inspect daily values. Zoom in by clicking and dragging."),
@@ -466,6 +573,7 @@ server <- function(input, output, session) {
 
   irrigation_data <- reactiveVal(make_default_irrigation_range(default_start, default_end))
   openet_data <- reactiveVal(make_empty_openet_range(default_start, default_end))
+  eto_data <- reactiveVal(NULL)
   openet_status <- reactiveVal("No OpenET API request made yet.")
   openet_location <- reactiveVal(list(latitude = NA_real_, longitude = NA_real_, start_date = NA, end_date = NA))
   ssurgo_status <- reactiveVal("")
@@ -507,6 +615,42 @@ server <- function(input, output, session) {
     },
     ignoreInit = TRUE
   )
+
+  # Input validation
+  observe({
+    req(input$lat)
+    shinyFeedback::feedbackDanger("lat",
+      show = input$lat < 24 || input$lat > 50,
+      text = "Latitude should be between 24\u00b0 and 50\u00b0"
+    )
+  })
+
+  observe({
+    req(input$lon)
+    shinyFeedback::feedbackDanger("lon",
+      show = input$lon > -95 || input$lon < -130,
+      text = "Longitude should be between -130\u00b0 and -95\u00b0 (western US)"
+    )
+  })
+
+  observe({
+    req(input$field_capacity, input$pwp, input$allowable_dryness)
+    fc <- input$field_capacity
+    pwp <- input$pwp
+    ad <- input$allowable_dryness
+    shinyFeedback::feedbackDanger("field_capacity",
+      show = isTRUE(fc <= pwp),
+      text = "Field capacity must be greater than permanent wilting point"
+    )
+    shinyFeedback::feedbackWarning("allowable_dryness",
+      show = isTRUE(ad < pwp || ad > fc),
+      text = "Allowable dryness should be between PWP and field capacity"
+    )
+    shinyFeedback::feedbackDanger("pwp",
+      show = isTRUE(pwp >= fc),
+      text = "Permanent wilting point must be less than field capacity"
+    )
+  })
 
   observeEvent(input$show_help, {
     showModal(modalDialog(
@@ -555,14 +699,28 @@ server <- function(input, output, session) {
         end_date <- as.Date(input$date_range[2])
         fetch_models <- if (isTRUE(input$download_all_models)) models else input$openet_model
         if (!"ENSEMBLE" %in% fetch_models) fetch_models <- unique(c(fetch_models, "ENSEMBLE"))
-        withProgress(message = "Fetching OpenET data", value = 0, {
+        n_calls <- length(fetch_models) + 1 + isTRUE(input$download_eto)
+        withProgress(message = "Fetching OpenET data", detail = "This may take 1\u20133 min per request\u2026", value = 0, {
           et_list <- list()
           for (i in seq_along(fetch_models)) {
-            incProgress(0.75 / length(fetch_models), detail = paste("Fetching", fetch_models[i], "ET"))
+            incProgress(0.75 / length(fetch_models), detail = sprintf("Fetching %s ET (%d of %d) \u2014 please wait\u2026", fetch_models[i], i, length(fetch_models)))
             et_list[[fetch_models[i]]] <- fetch_openet_point(input$api_key, input$lon, input$lat, start_date, end_date, model = fetch_models[i], variable = "ET")
           }
-          incProgress(0.15, detail = "Fetching precipitation")
+          incProgress(0.12, detail = "Fetching precipitation \u2014 please wait\u2026")
           pr <- fetch_openet_point(input$api_key, input$lon, input$lat, start_date, end_date, model = "ENSEMBLE", variable = "PR")
+          if (isTRUE(input$download_eto)) {
+            incProgress(0.08, detail = "Fetching reference ET (ETo) \u2014 please wait\u2026")
+            eto_result <- tryCatch(
+              fetch_openet_point(input$api_key, input$lon, input$lat, start_date, end_date, model = "ENSEMBLE", variable = "ETO"),
+              error = function(e) {
+                openet_status(paste("ETo fetch warning:", conditionMessage(e)))
+                NULL
+              }
+            )
+            eto_data(eto_result)
+          } else {
+            eto_data(NULL)
+          }
           out <- combine_openet_models(et_list, pr, start_date, end_date)
           openet_data(out)
           irrigation_data(sync_irrigation_to_range(irrigation_data(), start_date, end_date))
@@ -572,7 +730,22 @@ server <- function(input, output, session) {
           irrig_version(irrig_version() + 1L)
         })
       },
-      error = function(e) openet_status(paste("OpenET API error:", conditionMessage(e)))
+      error = function(e) {
+        msg <- conditionMessage(e)
+        if (grepl("timed out|Timeout", msg, ignore.case = TRUE)) {
+          openet_status(paste0(
+            "OpenET API timed out. The server is likely busy or the date range is too long. ",
+            "Try a shorter date range (e.g. one season at a time), wait a minute, then retry. ",
+            "Technical detail: ", msg
+          ))
+        } else if (grepl("429", msg)) {
+          openet_status("OpenET API rate limit reached (HTTP 429). Wait a few minutes before retrying.")
+        } else if (grepl("PROTOCOL_ERROR|HTTP/2|framing layer|stream.*not closed", msg, ignore.case = TRUE)) {
+          openet_status("OpenET connection dropped (HTTP/2 protocol error). This is a transient server issue — click 'Update OpenET data' again to retry.")
+        } else {
+          openet_status(paste("OpenET API error:", msg))
+        }
+      }
     )
   })
 
@@ -673,15 +846,30 @@ server <- function(input, output, session) {
 
   output$eta_plot <- renderPlotly({
     df <- make_excel_plot_balance(balance(), setup_values())
+    show_eto <- isTRUE(input$show_eto_plot) && !is.null(eto_data()) && nrow(eto_data()) > 0
+    if (show_eto) {
+      eto <- eto_data()
+      eto$date <- as.Date(eto$date)
+      df <- merge(df, eto[, c("date", "eto_in")], by = "date", all.x = TRUE)
+      df$eto_in[is.na(df$eto_in)] <- 0
+      df <- df[order(df$date), ]
+      df$cumulative_eto_in <- cumsum(df$eto_in)
+    }
     p <- ggplot(df, aes(x = date)) +
       geom_line(aes(y = cumulative_eta_in, color = "Σ ETa, in."), linewidth = 1.0) +
       geom_line(aes(y = cumulative_applied_in, color = "Σ Applied Water, in."), linewidth = 1.0, linetype = "dashed") +
-      geom_line(aes(y = applied_minus_eta_in, color = "Σ Applied − Σ ETa"), linewidth = 0.8, linetype = "dotdash") +
-      scale_color_manual(values = c(
-        "Σ ETa, in." = "#C62828",
-        "Σ Applied Water, in." = "#1565C0",
-        "Σ Applied − Σ ETa" = "#2E7D32"
-      )) +
+      geom_line(aes(y = applied_minus_eta_in, color = "Σ Applied − Σ ETa"), linewidth = 0.8, linetype = "dotdash")
+    if (show_eto) {
+      p <- p + geom_line(aes(y = cumulative_eto_in, color = "Σ ETo, in."), linewidth = 0.9, linetype = "dotted")
+    }
+    color_vals <- c(
+      "Σ ETa, in." = "#C62828",
+      "Σ Applied Water, in." = "#1565C0",
+      "Σ Applied − Σ ETa" = "#2E7D32",
+      "Σ ETo, in." = "#7B1FA2"
+    )
+    p <- p +
+      scale_color_manual(values = color_vals) +
       labs(x = NULL, y = "Cumulative Water, in.", color = NULL) +
       theme_minimal(base_size = 13) +
       theme(legend.position = "top", legend.text = element_text(size = 10))
@@ -690,7 +878,11 @@ server <- function(input, output, session) {
 
   output$soil_plot <- renderPlotly({
     df <- make_excel_plot_balance(balance(), setup_values())
+    # geom_ribbon with show.legend=FALSE — clean_plotly_hover skips it via isFALSE(showlegend)
     p <- ggplot(df, aes(x = date)) +
+      geom_ribbon(aes(ymin = permanent_wilting_point_in, ymax = allowable_dryness_in),
+        fill = "#FFCDD2", alpha = 0.30, color = NA
+      ) +
       geom_col(aes(y = precip_plot_in, fill = "Precipitation, in."), alpha = 0.55, na.rm = TRUE) +
       geom_point(aes(y = applied_plot_in, color = "Applied Water Event, in."), size = 3, shape = 24, na.rm = TRUE) +
       geom_line(aes(y = field_capacity_in, color = "Field Capacity, in."), linetype = "dashed", linewidth = 0.8) +
@@ -826,10 +1018,100 @@ server <- function(input, output, session) {
       addMarkers(lng = input$lon, lat = input$lat, popup = paste(input$field_id, "<br>", input$crop))
   })
 
+  observeEvent(input$map_style,
+    {
+      tile <- if (input$map_style == "satellite") providers$Esri.WorldImagery else providers$OpenStreetMap
+      leafletProxy("field_map") |>
+        clearTiles() |>
+        addProviderTiles(tile)
+    },
+    ignoreInit = TRUE
+  )
+
   output$download_balance <- downloadHandler(
     filename = function() paste0("openet_wetgraph_", input$field_id, "_", as.Date(input$date_range[1]), "_", as.Date(input$date_range[2]), ".xlsx"),
     content = function(file) write_balance_export(balance(), irrigation_data(), openet_data(), setup_values(), file)
   )
+
+  # ── Save session ──────────────────────────────────────────────────────────
+  output$save_session <- downloadHandler(
+    filename = function() paste0("session_", input$field_id, "_", Sys.Date(), ".rds"),
+    content = function(file) {
+      session_data <- list(
+        version = 1L,
+        saved_at = Sys.time(),
+        setup = list(
+          field_id = input$field_id,
+          crop = input$crop,
+          date_range = input$date_range,
+          lat = input$lat,
+          lon = input$lon,
+          app_rate = input$app_rate,
+          initial_water = input$initial_water,
+          allowable_dryness = input$allowable_dryness,
+          field_capacity = input$field_capacity,
+          pwp = input$pwp,
+          root_depth_ft = input$root_depth_ft,
+          openet_model = input$openet_model,
+          download_all_models = input$download_all_models,
+          download_eto = input$download_eto,
+          count_precip_effective = input$count_precip_effective
+        ),
+        irrigation_data = irrigation_data(),
+        openet_data = openet_data(),
+        eto_data = eto_data(),
+        openet_location = openet_location()
+      )
+      saveRDS(session_data, file)
+    }
+  )
+
+  # ── Load session ──────────────────────────────────────────────────────────
+  session_msg <- reactiveVal(NULL)
+  output$session_status <- renderUI({
+    msg <- session_msg()
+    if (is.null(msg)) {
+      return(NULL)
+    }
+    div(
+      class = if (grepl("^Error", msg)) "warn-box" else "ok-box",
+      style = "margin-top: 6px; font-size: 12px;", msg
+    )
+  })
+
+  observeEvent(input$load_session, {
+    req(input$load_session)
+    tryCatch(
+      {
+        sd <- readRDS(input$load_session$datapath)
+        s <- sd$setup
+        updateTextInput(session, "field_id", value = s$field_id)
+        updateTextInput(session, "crop", value = s$crop)
+        updateDateRangeInput(session, "date_range", start = as.Date(s$date_range[1]), end = as.Date(s$date_range[2]))
+        updateNumericInput(session, "lat", value = s$lat)
+        updateNumericInput(session, "lon", value = s$lon)
+        updateNumericInput(session, "app_rate", value = s$app_rate)
+        updateNumericInput(session, "initial_water", value = s$initial_water)
+        updateNumericInput(session, "allowable_dryness", value = s$allowable_dryness)
+        updateNumericInput(session, "field_capacity", value = s$field_capacity)
+        updateNumericInput(session, "pwp", value = s$pwp)
+        updateNumericInput(session, "root_depth_ft", value = s$root_depth_ft %||% 4.0)
+        updateSelectInput(session, "openet_model", selected = s$openet_model)
+        updateCheckboxInput(session, "download_all_models", value = isTRUE(s$download_all_models))
+        updateCheckboxInput(session, "download_eto", value = isTRUE(s$download_eto))
+        updateCheckboxInput(session, "count_precip_effective", value = isTRUE(s$count_precip_effective))
+        irrigation_data(sd$irrigation_data)
+        openet_data(sd$openet_data)
+        eto_data(sd$eto_data)
+        openet_location(sd$openet_location)
+        irrig_version(irrig_version() + 1L)
+        session_msg(paste0("Session loaded: ", s$field_id, " (saved ", format(sd$saved_at, "%b %d %Y %H:%M"), ")"))
+      },
+      error = function(e) {
+        session_msg(paste("Error loading session:", conditionMessage(e)))
+      }
+    )
+  })
 }
 
 shinyApp(ui, server)

@@ -197,7 +197,7 @@ fetch_openet_point <- function(api_key, longitude, latitude, start_date, end_dat
 
 parse_openet_response <- function(body_text, variable = "ET", model = "ENSEMBLE") {
   variable <- toupper(variable)
-  value_name <- if (variable == "PR") "precip_in" else toupper(model)
+  value_name <- if (variable == "PR") "precip_in" else if (variable == "ETO") "eto_in" else toupper(model)
   body_text <- trimws(body_text)
   if (!nzchar(body_text)) stop("OpenET returned an empty response.")
   if (startsWith(body_text, "[") || startsWith(body_text, "{")) {
