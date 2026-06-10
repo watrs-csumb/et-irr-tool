@@ -578,7 +578,20 @@ ui <- fluidPage(
                 id = "faq7", class = "panel-collapse collapse",
                 tags$div(
                   class = "panel-body",
-                  p("The balance tracks daily soil water content using: Soil Water = Previous Soil Water + Irrigation + Effective Precipitation − ETa. An irrigation event is suggested when soil water drops below the allowable dryness threshold.")
+                  p(tags$b("Soil water balance")),
+                  p("The balance tracks daily soil water content using:"),
+                  tags$p(tags$code("SWC = SWC_prev + Irrigation + Effective Precipitation − ETa"), style = "margin-left: 16px;"),
+                  p("An irrigation event is suggested when soil water drops to or below the allowable dryness (MAD) threshold. Soil water is capped at field capacity — any water in excess drains as deep percolation."),
+                  hr(style = "margin: 10px 0;"),
+                  p(tags$b("Deep percolation")),
+                  p("Deep percolation is the water that drains below the root zone on days when the computed soil water would exceed field capacity:"),
+                  tags$p(tags$code("Deep percolation (in.) = max(0, SWC_prev + Inputs − ETa − Field Capacity)"), style = "margin-left: 16px;"),
+                  p("Cumulative deep percolation (Σ Deep Percolation) is the running total over the season. It represents water that was applied or received as precipitation but was not retained in the root zone — it is unavailable to the crop and may carry nutrients below the root zone."),
+                  hr(style = "margin: 10px 0;"),
+                  p(tags$b("Leaching fraction")),
+                  p("The leaching fraction is the cumulative fraction of total applied water (irrigation + effective precipitation) that has drained below the root zone:"),
+                  tags$p(tags$code("Leaching Fraction = Σ Deep Percolation / Σ Water Credited"), style = "margin-left: 16px;"),
+                  p("where ", tags$em("Water Credited"), " is the sum of net irrigation applied plus any effective precipitation counted. A leaching fraction of 0.10 means 10% of applied water left the root zone. High values indicate over-irrigation or heavy precipitation events that exceed field capacity.")
                 )
               )
             ),
@@ -1587,7 +1600,7 @@ server <- function(input, output, session) {
         column(
           5,
           br(),
-          actionButton("reset_kc", "Reset to 7-day avg (ETa/ETo)",
+          actionButton("reset_kc", "Reset to 7-day avg (ET/ETo)",
             class = "btn btn-default btn-xs", style = "margin-top: 4px;"
           )
         )
