@@ -1507,9 +1507,41 @@ server <- function(input, output, session) {
     }
     kc_est_val <- tryCatch(est_kc(), error = function(e) NA_real_)
     kc_default <- if (!is.na(kc_est_val)) kc_est_val else 1.0
+    # staleness notice for the forecast
+    stale_notice <- local({
+      days_stale <- as.integer(Sys.Date() - base$last_date)
+      last_str <- format(base$last_date, "%b %d, %Y")
+      if (days_stale <= 1) {
+        div(
+          style = "margin-bottom: 8px; font-size: 13px; color: #388E3C;",
+          icon("check-circle"),
+          sprintf(" Soil water balance data is current through %s.", last_str)
+        )
+      } else if (days_stale <= 4) {
+        div(
+          style = "margin-bottom: 8px; font-size: 13px; color: #667085;",
+          icon("info-circle"),
+          sprintf(
+            " The forecast starts from the last date in your soil water balance data (%s, %d days ago). Soil water content may not reflect current conditions.",
+            last_str, days_stale
+          )
+        )
+      } else {
+        div(
+          class = "warn-box",
+          style = "margin-bottom: 8px;",
+          icon("exclamation-triangle"),
+          sprintf(
+            " The last date in your soil water balance data is %s (%d days ago). The starting soil water content used in this forecast is outdated — update your OpenET end date to today for an accurate projection.",
+            last_str, days_stale
+          )
+        )
+      }
+    })
     div(
       class = "wet-card",
       h4("7-Day Soil Water Depletion & ET using ETo Forecast"),
+      stale_notice,
       uiOutput("eto_forecast_status"),
       br(),
       fluidRow(
