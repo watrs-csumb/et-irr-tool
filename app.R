@@ -604,15 +604,14 @@ ui <- fluidPage(
                   p(HTML('The 7-day forecast in the <b>Irrigation Explorer</b> tab uses reference evapotranspiration (ETo) from <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, a free and open-source weather API.')),
                   p(tags$b("How it works:")),
                   tags$ul(
-                    tags$li("For the US,", tags$b("NOAA's GFS and HRRR models"), " (3–25 km resolution, updated hourly), forecast temperature, humidity, wind speed, and solar radiation — that are used to compute ETo using the ", tags$b("FAO-56 Penman-Monteith equation"), ", the same standard method used by gridMET and state climate offices (e.g. CIMIS in California)."),
-                    tags$li("This app multiplies this forecasted ETo by a crop coefficient (Kc), that can be input by the user or estimated using the ratio of ET and ETo (from OpenET) over the past 7 days, to estimate daily crop ET over the 7-day forecast window.")
+                    tags$li("For the US,", tags$b("NOAA's GFS and HRRR models"), " (3–25 km resolution, updated hourly), forecast temperature, humidity, wind speed, and solar radiation — that are used to compute ETo using the ", tags$b("FAO-56 Penman-Monteith equation"), ", the same standard method used by gridMET and state climate offices (e.g. CIMIS in California) and is available for a 7 day forecast."),
+                    tags$li("This app multiplies this forecasted ETo by a crop coefficient (Kc), that can be input by the user or estimated using the average ratio of ET and ETo (from OpenET) over the past 7 days.")
                   ),
                   p(tags$b("What is the crop coefficient (Kc)?")),
-                  p("Kc accounts for the difference between a reference surface (ETo) and your actual crop. The app auto-estimates Kc from the ratio of your satellite-based crop ET (ETa from OpenET) to the gridMET ETo over the past 7 days. You can also enter a value manually based on your crop growth stage."),
+                  p("Kc accounts for the difference between a reference surface (ETo) and your actual crop. The app auto-estimates Kc from the ratio of your remote sensing based crop ET (ETa from OpenET) to the gridMET ETo over the past 7 days. You can also enter a value manually based on your crop growth stage."),
                   p(tags$em("Note: The forecast is most useful as a short-term planning aid (1-7 days)."),
                     style = "font-size: 12px; color: #667085;"
-                  ),
-                  p(a("Open-Meteo documentation", href = "https://open-meteo.com/en/docs", target = "_blank"))
+                  )
                 )
               )
             )
