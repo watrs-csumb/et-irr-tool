@@ -637,11 +637,8 @@ server <- function(input, output, session) {
       hr(),
       h5("Getting started:"),
       tags$ol(
-        tags$li(
-          tags$b("Create a free OpenET account"), " and generate an API key at ",
-          a("etdata.org", href = "https://etdata.org", target = "_blank"), "."
-        ),
-        tags$li("Enter your", tags$b("Field ID"), ",", tags$b("Crop"), ",", tags$b("Date range"), ",", tags$b("Coordinates"), ", and", tags$b("Soil Properties"), " in the left panel."),
+        tags$li(HTML('<b>Create a free OpenET account</b> and generate an API key at <a href="https://etdata.org" target="_blank">etdata.org</a>.')),
+        tags$li(HTML("Enter your <b>Field ID</b>, <b>Crop</b>, <b>Date range</b>, <b>Coordinates</b>, and <b>Soil Properties</b> in the left panel.")),
         tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location and root zone depth."),
         tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
         tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
@@ -762,11 +759,8 @@ server <- function(input, output, session) {
         hr(),
         h5("Getting started:"),
         tags$ol(
-          tags$li(
-            tags$b("Create a free OpenET account"), " and generate an API key at ",
-            a("etdata.org", href = "https://etdata.org", target = "_blank"), "."
-          ),
-          tags$li("Enter your", tags$b("Field ID"), ",", tags$b("Crop"), ",", tags$b("Date range"), ",", tags$b("Coordinates"), ", and", tags$b("Soil Properties"), " in the left panel."),
+          tags$li(HTML('<b>Create a free OpenET account</b> and generate an API key at <a href="https://etdata.org" target="_blank">etdata.org</a>.')),
+          tags$li(HTML("Enter your <b>Field ID</b>, <b>Crop</b>, <b>Date range</b>, <b>Coordinates</b>, and <b>Soil Properties</b> in the left panel.")),
           tags$li("Optionally click ", tags$b("Fetch Soil from SSURGO"), " to auto-fill soil properties for your location and root zone depth."),
           tags$li("Paste your ", tags$b("OpenET API key"), " into the OpenET section and click ", tags$b("Update OpenET data"), "."),
           tags$li("Enter irrigation events in the ", tags$b("Irrigation Amounts"), " tab and view the water balance on the ", tags$b("Dashboard"), "."),
