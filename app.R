@@ -293,9 +293,8 @@ ui <- fluidPage(
           br(),
           div(
             class = "wet-card",
-            p(class = "help-text", "Excel-equivalent rule: Net Water Applied is the input used by the water balance. OpenET precipitation is displayed separately unless the option below is checked."),
-            checkboxInput("count_precip_effective", "Count all OpenET precipitation as effective water", value = default_setup$count_precip_effective),
             p(class = "help-text", "When checked, the soil water balance credits OpenET precipitation in addition to entered irrigation: irrigation + precipitation - ETa."),
+            checkboxInput("count_precip_effective", "Count all OpenET precipitation as effective water", value = default_setup$count_precip_effective),
             fluidRow(
               column(3, dateInput("new_irrig_date", "Date", value = default_start)),
               column(3, numericInput("new_irrig_in", "Net water applied, in.", value = 0, step = 0.01)),
