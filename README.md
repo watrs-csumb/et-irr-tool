@@ -1,12 +1,10 @@
-# OpenET Irrigation Scheduling Tool — R Shiny App
+# OpenET Irrigation Scheduling Tool
 
-An interactive irrigation scheduling tool built with R Shiny. It combines **OpenET** satellite-based evapotranspiration data, **SSURGO** soil properties, and **Open-Meteo** 7-day ETo forecasts to track field soil water balance and support irrigation decisions.
+An R Shiny app for field-level irrigation scheduling. Tracks daily soil water balance using **OpenET** satellite ET, **SSURGO** soil properties, and an **Open-Meteo** 7-day ETo forecast to tell you when and how much to irrigate.
 
 ---
 
 ## Quick Start
-
-Open R or RStudio in this folder and run:
 
 ```r
 install.packages(c(
@@ -14,115 +12,95 @@ install.packages(c(
   "readxl", "openxlsx", "httr2", "jsonlite", "readr",
   "soilDB", "shinyFeedback", "shinycssloaders"
 ))
-
 shiny::runApp()
-```
-
-Or from a terminal:
-
-```bash
-R -e "shiny::runApp()"
 ```
 
 ---
 
 ## Workflow
 
-1. Enter your **OpenET API key** in the sidebar.
-2. Set the **date range**, **coordinates** (lat/lon), **crop**, and **soil-water parameters**.
-3. *(Optional)* Click **Fetch Soil from SSURGO** to auto-populate field capacity and permanent wilting point from NRCS SSURGO data.
-4. Click **Update OpenET data** to fetch ET, precipitation, and reference ETo from OpenET.
-5. Go to **Irrigation Amounts** and enter daily **Net water applied, in.** values.
-6. Explore the **Dashboard** plots and use the **Irrigation Explorer** for forward-looking scheduling.
+1. Enter your **OpenET API key** and set **field info**: coordinates, date range, and crop.
+2. *(Optional)* Click **Fetch Soil from SSURGO** to auto-fill field capacity and permanent wilting point.
+3. Set **allowable depletion** (MAD threshold) and initial soil water content.
+4. Click **Update OpenET data** to fetch ET, precipitation, and ETo.
+5. Go to **Irrigation Amounts** and enter net water applied (in.) per irrigation event.
+6. Use the **Dashboard** to review the season balance and the **Irrigation Explorer** to plan the next irrigation.
 
 ---
 
 ## Tabs
 
 ### Dashboard
-Four interactive plots showing the full season water balance:
+Season overview with four plots and four summary metrics (total ETa, applied water, precipitation, deep percolation).
 
-| Plot | Description |
+| Plot | Shows |
 |---|---|
-| Soil Water | Daily soil water content (in.) vs. field capacity, MAD threshold, and PWP. Precipitation shown as dots. |
-| Cumulative Water | Cumulative ETa and applied water (and ETo when available). |
-| Deep Percolation | Daily deep percolation and leaching fraction (dual y-axis). |
-| Daily ET, ETo & ET/ETo | Daily ETa, ETo, and their ratio (crop coefficient proxy). |
-
-Four summary metrics appear above the plots: total ETa, total applied water, total precipitation, and total deep percolation.
+| Soil Water | Daily SWC vs. field capacity, MAD threshold, and PWP |
+| Cumulative Water | Σ ETa vs. Σ applied water (+ ETo when available) |
+| Deep Percolation | Daily drainage and leaching fraction |
+| ET / ETo | Daily ETa, ETo, and ET/ETo ratio (crop coefficient proxy) |
 
 ### Irrigation Amounts
-Enter daily net water applied (in.) events. Each entry includes date, amount, and an optional note. Precipitation handling is controlled by the **Count all OpenET precipitation as effective water** checkbox.
+Log daily irrigation events (date, net water applied, optional note). Check **Count all OpenET precipitation as effective water** to credit precipitation in the water balance.
 
 ### Irrigation Explorer
-Forward-looking soil water depletion planning and forecast tool. Consists of two charts:
+Forward-looking depletion planning — two views:
 
-#### Planning View (flat ET projection, full horizon)
-Projects soil water depletion from the last day of OpenET data using a constant daily ET rate over a user-selected horizon (7–30 days). Inputs:
+**Planning View**
+Projects soil water from the last OpenET date using a constant ET rate. Adjust inputs and see results immediately:
 
-| Input | Description |
+| Input | Default |
 |---|---|
-| Projected daily ET (in./day) | Defaults to 7-day average of recent non-zero OpenET ETa. Editable. |
-| Apply irrigation today (in.) | Simulates an irrigation event applied from the current SWC. |
-| Forecast horizon (days) | 7–30 day projection window. |
+| Projected daily ET (in./day) | 7-day average of recent ETa |
+| Apply irrigation today (in.) | 0 — simulate an upcoming event |
+| Forecast horizon (days) | 7–30 days |
 
-Reference lines: Field Capacity, MAD Threshold, Permanent Wilting Point. A vertical "Irrigate by" marker shows when SWC is projected to hit the MAD threshold.
+Shows current SWC, water available before MAD, projected daily ET, and **days until the next irrigation is due**. A vertical marker on the chart flags the irrigation deadline.
 
-Four metric boxes: current SWC, available water before MAD, projected daily ET, and days until irrigation.
-
-#### 7-Day ETo Forecast — Weather-Based View (Open-Meteo)
-A second chart appears automatically when your data ends within the last 7 days and the Open-Meteo API is reachable. It uses a **7-day daily ETo forecast** (FAO-56 Penman-Monteith) from [Open-Meteo](https://open-meteo.com/) — free, no API key required — to drive a weather-aware SWC projection.
-
-**Crop coefficient (Kc):** The forecast ET per day is computed as `Kc × ETo_forecast`. Kc defaults to the 7-day mean ETa/ETo ratio from your OpenET data (estimated crop coefficient). It can be adjusted manually, and a **Reset to 7-day avg** button restores the estimated value.
-
-If your data end date is more than 7 days in the past, this chart shows an informational message prompting you to update the end date.
+**7-Day Weather Forecast View** *(appears automatically when data is current)*
+Uses the Open-Meteo FAO-56 Penman-Monteith ETo forecast and a crop coefficient (Kc) to project ET day-by-day. Kc defaults to the 7-day ETa/ETo ratio from your OpenET data; you can adjust it manually or reset to the estimate. Gives a weather-driven irrigation date vs. the flat-ET planning view.
 
 ### Calcs
-Full daily water balance table (downloadable as Excel). Columns include date, ETa, ETo, precipitation, irrigation, soil water content, deep percolation, and cumulative values.
+Full daily water balance table. Download as Excel (`.xlsx`).
 
 ### OpenET
-Raw OpenET API response table for all fetched models.
+Raw OpenET API response for all fetched models.
 
 ### Map
-Field location map with Esri World Imagery / OpenStreetMap toggle.
+Field location with Satellite / Street Map toggle.
 
 ### FAQ
-Embedded answers to common questions about data sources, calculations, and soil parameters.
+In-app reference: ET definitions, OpenET models, SSURGO soil calculations, water balance methodology, and ETo forecast source.
+
+---
+
+## Multi-Field Support
+
+Add multiple fields with the **+ Add field** button in the sidebar. Each field has its own inputs, irrigation log, and fetched data. Switch between fields with the dropdown — data is saved per field and persists in the session file.
 
 ---
 
 ## Data Sources
 
-| Dataset | Source | Access |
+| Dataset | Source | Key required |
 |---|---|---|
-| Evapotranspiration (ETa) | [OpenET](https://openetdata.org/) — ensemble or individual model | API key required |
-| Precipitation | OpenET / gridMET | Fetched alongside ETa |
-| Reference ET (ETo) | OpenET / gridMET | Fetched alongside ETa |
-| Soil properties (FC, PWP) | [USDA NRCS SSURGO](https://www.nrcs.usda.gov/resources/data-and-reports/ssurgo) via Soil Data Access | No key — auto-queried by lat/lon |
-| 7-day ETo forecast | [Open-Meteo](https://open-meteo.com/) — FAO-56 Penman-Monteith | No key required |
+| ETa + Precipitation + ETo | [OpenET](https://openetdata.org/) | Yes |
+| Soil properties (FC, PWP, AWC) | [USDA NRCS SSURGO](https://www.nrcs.usda.gov/resources/data-and-reports/ssurgo) | No |
+| 7-day ETo forecast | [Open-Meteo](https://open-meteo.com/) — FAO-56 PM | No |
 
 ---
 
 ## Soil Properties (SSURGO)
 
-The **Fetch Soil from SSURGO** button queries the USDA NRCS Soil Data Access (SDA) web service for the dominant soil component at the entered lat/lon and root zone depth.
+Click **Fetch Soil from SSURGO** to auto-populate FC and PWP from the dominant soil component at your coordinates. The result box shows soil series, map unit key (mukey), root zone depth, FC, PWP, AWC, and a 50% MAD reference value.
 
-| Parameter | Auto-populated |
-|---|---|
-| Field capacity (in.) | ✅ |
-| Permanent wilting point (in.) | ✅ |
-| MAD threshold (in.) | ❌ — set manually |
-| Initial water content (in.) | ❌ — set manually |
-
-The status box reports the soil series name, SSURGO map unit key (mukey), plant-available water capacity (AWC), and a 50% MAD reference value. **50% MAD** is a common starting point (FC − 0.5 × AWC), but the correct value depends on crop type, growth stage, and irrigation system capacity.
+> **FC and PWP are updated automatically. Allowable depletion and initial water content must be set manually** based on your crop, growth stage, and management.
 
 ---
 
 ## Session Management
 
-Use the **Session** panel in the sidebar to:
-- **Save Session** — exports all inputs, irrigation entries, and fetched ET data to an `.rds` file.
-- **Load Session** — restores a previously saved session in full.
+Use the **Session** panel to save or load your entire workspace (inputs, irrigation log, and fetched data) as an `.rds` file. The filename defaults to `fields_N_MM_DD_YYYY_HHMM` but can be edited before saving.
 
 ---
 
@@ -130,6 +108,6 @@ Use the **Session** panel in the sidebar to:
 
 ```
 app.R                  # Shiny UI and server logic
-R/openet_utils.R       # OpenET API, Open-Meteo, SSURGO, water balance, and export utilities
+R/openet_utils.R       # API calls, SSURGO, water balance, and export utilities
 ```
 
