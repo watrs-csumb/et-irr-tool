@@ -578,8 +578,7 @@ ui <- fluidPage(
                     tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
                     tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed deficit (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
                     tags$li(tags$b("Available Water Capacity (AWC):"), " Defined as ", tags$code("AWC = FC − PWP"), " — the water held loosely enough for roots to extract, but tightly enough not to drain. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm and used without conversion. Multiplied by root zone depth it gives inches of plant-available water.")
-                  ),
-                  p(tags$em("Note: AWC (", tags$code("awc_r"), ") is already reported as a volumetric fraction (cm/cm) in SSURGO and is used directly."), style = "font-size: 12px; color: #667085;")
+                  )
                 )
               )
             ),
