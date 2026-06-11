@@ -1697,7 +1697,7 @@ server <- function(input, output, session) {
           )
           restore_field(store[[cur_key]])
           session_msg(paste0(
-            "Session loaded: ", length(store),
+            "Session loaded: ", length(store), " field(s)",
             " (saved ", format(sd$saved_at, "%b %d %Y %H:%M"), ")"
           ))
         } else {
