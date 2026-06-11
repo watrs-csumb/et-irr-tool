@@ -576,7 +576,7 @@ ui <- fluidPage(
                     tags$li(tags$b("Gravimetric to volumetric conversion:"), " SSURGO reports moisture at field capacity (1/3 bar, ", tags$code("wthirdbar_r"), ") and permanent wilting point (15 bar, ", tags$code("wfifteenbar_r"), ") as % by weight. These are converted to volumetric fractions (cm³ water / cm³ soil) by multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³)."),
                     tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons within the root zone."),
                     tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
-                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed deficit (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
+                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed depletion (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
                     tags$li(tags$b("Available Water Capacity (AWC):"), " Defined as ", tags$code("AWC = FC − PWP"), " — the water held loosely enough for roots to extract, but tightly enough not to drain. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm and used without conversion. Multiplied by root zone depth it gives inches of plant-available water.")
                   )
                 )
@@ -1529,7 +1529,7 @@ server <- function(input, output, session) {
         colnames = c(
           "Date", "Net Water Applied, in.", "Σ Net Applied, in.",
           "Equiv. Irrig. Hours", "Precip. in.",
-          "Soil Water Deficit, in.", "Notes / Flow Meter"
+          "Soil Water Depletion, in.", "Notes / Flow Meter"
         ),
         options = list(pageLength = 15, scrollX = TRUE, ordering = FALSE)
       ) |>
@@ -1570,7 +1570,7 @@ server <- function(input, output, session) {
       precip_in = "Precipitation, in.",
       applied_plot_in = "Applied Water Events, in.",
       precip_plot_in = "Precip. Events, in.",
-      soil_water_deficit_in = "Soil Water Deficit, in.",
+      soil_water_deficit_in = "Soil Water Depletion, in.",
       remaining_storage_capacity_in = "Remaining Storage, in.",
       equivalent_irrigation_hours = "Equiv. Irrig. Hours",
       selected_model = "ET Model",

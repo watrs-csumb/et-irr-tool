@@ -509,7 +509,7 @@ fetch_ssurgo_soil_properties <- function(latitude, longitude, rooting_depth_ft =
   pwp_in <- max(min(pwp_in, fc_in - 0.01), 0)
   awc_in <- max(awc_in, 0)
 
-  # Allowable dryness at 50% MAD (management allowed deficit) — common default
+  # Allowable dryness at 50% MAD (management allowed depletion) — common default
   allowable_in <- max(fc_in - 0.5 * awc_in, pwp_in)
 
   list(
