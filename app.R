@@ -109,9 +109,9 @@ clean_plotly_hover <- function(p) {
     # ribbon traces: ggplotly always sets showlegend=FALSE on geom_ribbon.
     # Re-enable showlegend with a proper label; show name in hover but no value.
     if (isFALSE(p$x$data[[i]]$showlegend) && identical(p$x$data[[i]]$fill, "toself")) {
-      p$x$data[[i]]$name <- "Undesired Dryness Zone"
+      p$x$data[[i]]$name <- "Undesired Depletion Zone"
       p$x$data[[i]]$showlegend <- TRUE
-      p$x$data[[i]]$hovertemplate <- "Undesired Dryness Zone<extra></extra>"
+      p$x$data[[i]]$hovertemplate <- "Undesired Depletion Zone<extra></extra>"
       next
     }
     # skip any other traces explicitly hidden (none currently, kept for safety)
