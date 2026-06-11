@@ -744,32 +744,32 @@ server <- function(input, output, session) {
     if (grepl("^SSURGO error", msg)) {
       return(div(class = "warn-box", style = "font-size: 12px;", msg))
     }
-    # parse reactive val set after a successful fetch
-    if (!is.null(attr(msg, "soil"))) {
-      s <- attr(msg, "soil")
-      div(
-        style = "font-size: 12px; margin-top: 4px;",
-        tags$table(
-          style = "width: 100%; border-collapse: collapse;",
-          tags$tr(tags$td(tags$b("Soil series:"), style = "padding: 2px 6px 2px 0;"), tags$td(s$compname, style = "padding: 2px 0;")),
-          tags$tr(tags$td(tags$b("Map unit (mukey):"), style = "padding: 2px 6px 2px 0;"), tags$td(s$mukey, style = "padding: 2px 0;")),
-          tags$tr(tags$td(tags$b("Root zone depth:"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.1f ft", s$rooting_depth_ft), style = "padding: 2px 0;")),
-          tags$tr(tags$td(HTML("<b>Field Capacity (FC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$field_capacity_in), style = "padding: 2px 0;")),
-          tags$tr(tags$td(HTML("<b>Perm. Wilting Point (PWP):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$pwp_in), style = "padding: 2px 0;")),
-          tags$tr(tags$td(HTML("<b>Avail. Water Capacity (AWC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$awc_in), style = "padding: 2px 0;")),
-          tags$tr(tags$td(HTML("<b>50% MAD (reference):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$allowable_dryness_in), style = "padding: 2px 0;"))
-        ),
-        hr(style = "margin: 6px 0;"),
-        p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity and PWP updated."),
-        p(
-          style = "color: #667085; font-size: 11px; margin: 4px 0 0;",
-          tags$em("Allowable dryness and initial water content were not changed \u2014 set those based on management and current field conditions.")
-        )
-      )
-    } else {
-      # fallback plain text
-      pre(style = "font-size: 11px;", msg)
+    if (msg == "ok") {
+      s <- ssurgo_result()
+      if (!is.null(s)) {
+        return(div(
+          style = "font-size: 12px; margin-top: 4px;",
+          tags$table(
+            style = "width: 100%; border-collapse: collapse;",
+            tags$tr(tags$td(tags$b("Soil series:"), style = "padding: 2px 6px 2px 0;"), tags$td(s$compname, style = "padding: 2px 0;")),
+            tags$tr(tags$td(tags$b("Map unit (mukey):"), style = "padding: 2px 6px 2px 0;"), tags$td(s$mukey, style = "padding: 2px 0;")),
+            tags$tr(tags$td(tags$b("Root zone depth:"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.1f ft", s$rooting_depth_ft), style = "padding: 2px 0;")),
+            tags$tr(tags$td(HTML("<b>Field Capacity (FC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$field_capacity_in), style = "padding: 2px 0;")),
+            tags$tr(tags$td(HTML("<b>Perm. Wilting Point (PWP):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$pwp_in), style = "padding: 2px 0;")),
+            tags$tr(tags$td(HTML("<b>Avail. Water Capacity (AWC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$awc_in), style = "padding: 2px 0;")),
+            tags$tr(tags$td(HTML("<b>50% MAD (reference):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$allowable_dryness_in), style = "padding: 2px 0;"))
+          ),
+          hr(style = "margin: 6px 0;"),
+          p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity and PWP updated."),
+          p(
+            style = "color: #667085; font-size: 11px; margin: 4px 0 0;",
+            tags$em("Allowable dryness and initial water content were not changed \u2014 set those based on management and current field conditions.")
+          )
+        ))
+      }
     }
+    # fallback for "Querying SSURGO..." or any other message
+    pre(style = "font-size: 11px;", msg)
   })
 
   # ── Multi-field management ──────────────────────────────────────────────────
@@ -833,7 +833,8 @@ server <- function(input, output, session) {
       eto_data = isolate(eto_data()),
       openet_location = isolate(openet_location()),
       openet_status_text = isolate(openet_status()),
-      ssurgo_status_text = isolate(ssurgo_status())
+      ssurgo_status_text = isolate(ssurgo_status()),
+      ssurgo_result_data = isolate(ssurgo_result())
     )
   }
 
@@ -863,6 +864,7 @@ server <- function(input, output, session) {
     openet_location(fd$openet_location)
     openet_status(fd$openet_status_text %||% "No OpenET API request made yet.")
     ssurgo_status(fd$ssurgo_status_text %||% "")
+    ssurgo_result(fd$ssurgo_result_data)
     irrig_version(irrig_version() + 1L)
   }
 
