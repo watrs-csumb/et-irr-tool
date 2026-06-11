@@ -239,7 +239,7 @@ ui <- fluidPage(
         numericInput("root_depth_ft", "Root zone depth, ft", value = 2.0, min = 0.5, max = 20, step = 0.5),
         actionButton("fetch_ssurgo", "Fetch Soil from SSURGO", class = "btn-primary btn-sm btn-block"),
         br(), br(),
-        verbatimTextOutput("ssurgo_status")
+        uiOutput("ssurgo_status")
       ),
       hr(),
       tags$details(
@@ -576,15 +576,9 @@ ui <- fluidPage(
                     tags$li(tags$b("Gravimetric to volumetric conversion:"), " SSURGO reports moisture at field capacity (1/3 bar, ", tags$code("wthirdbar_r"), ") and permanent wilting point (15 bar, ", tags$code("wfifteenbar_r"), ") as % by weight. These are converted to volumetric fractions (cm³ water / cm³ soil) by multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³)."),
                     tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons within the root zone."),
                     tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
-                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed deficit (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity.")
+                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed deficit (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
+                    tags$li(tags$b("Available Water Capacity (AWC):"), " Defined as ", tags$code("AWC = FC − PWP"), " — the water held loosely enough for roots to extract, but tightly enough not to drain. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm and used without conversion. Multiplied by root zone depth it gives inches of plant-available water.")
                   ),
-                  hr(style = "margin: 10px 0;"),
-                  p(tags$b("What is AWC?")),
-                  p(
-                    tags$b("Available Water Capacity (AWC)"), " is the amount of water the soil can hold that is actually available for plant uptake:",
-                  ),
-                  tags$p(tags$code("AWC = FC − PWP"), style = "margin-left: 16px;"),
-                  p("It represents the water held loosely enough for roots to extract, but tightly enough not to drain as deep percolation. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm (volumetric fraction) and is used directly — no conversion needed. Multiplied by root zone depth it gives inches of plant-available water."),
                   p(tags$em("Note: AWC (", tags$code("awc_r"), ") is already reported as a volumetric fraction (cm/cm) in SSURGO and is used directly."), style = "font-size: 12px; color: #667085;")
                 )
               )
@@ -738,11 +732,46 @@ server <- function(input, output, session) {
   openet_status <- reactiveVal("No OpenET API request made yet.")
   openet_location <- reactiveVal(list(latitude = NA_real_, longitude = NA_real_, start_date = NA, end_date = NA))
   ssurgo_status <- reactiveVal("")
+  ssurgo_result <- reactiveVal(NULL)
   irrig_version <- reactiveVal(0L)
   irrig_proxy <- dataTableProxy("irrig_table")
 
   output$openet_status <- renderText(openet_status())
-  output$ssurgo_status <- renderText(ssurgo_status())
+  output$ssurgo_status <- renderUI({
+    msg <- ssurgo_status()
+    if (!nzchar(msg %||% "")) {
+      return(NULL)
+    }
+    if (grepl("^SSURGO error", msg)) {
+      return(div(class = "warn-box", style = "font-size: 12px;", msg))
+    }
+    # parse reactive val set after a successful fetch
+    if (!is.null(attr(msg, "soil"))) {
+      s <- attr(msg, "soil")
+      div(
+        style = "font-size: 12px; margin-top: 4px;",
+        tags$table(
+          style = "width: 100%; border-collapse: collapse;",
+          tags$tr(tags$td(tags$b("Soil series:"), style = "padding: 2px 6px 2px 0;"), tags$td(s$compname, style = "padding: 2px 0;")),
+          tags$tr(tags$td(tags$b("Map unit (mukey):"), style = "padding: 2px 6px 2px 0;"), tags$td(s$mukey, style = "padding: 2px 0;")),
+          tags$tr(tags$td(tags$b("Root zone depth:"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.1f ft", s$rooting_depth_ft), style = "padding: 2px 0;")),
+          tags$tr(tags$td(HTML("<b>Field Capacity (FC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$field_capacity_in), style = "padding: 2px 0;")),
+          tags$tr(tags$td(HTML("<b>Perm. Wilting Point (PWP):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$pwp_in), style = "padding: 2px 0;")),
+          tags$tr(tags$td(HTML("<b>Avail. Water Capacity (AWC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$awc_in), style = "padding: 2px 0;")),
+          tags$tr(tags$td(HTML("<b>50% MAD (reference):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$allowable_dryness_in), style = "padding: 2px 0;"))
+        ),
+        hr(style = "margin: 6px 0;"),
+        p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity and PWP updated."),
+        p(
+          style = "color: #667085; font-size: 11px; margin: 4px 0 0;",
+          tags$em("Allowable dryness and initial water content were not changed \u2014 set those based on management and current field conditions.")
+        )
+      )
+    } else {
+      # fallback plain text
+      pre(style = "font-size: 11px;", msg)
+    }
+  })
 
   # ── Multi-field management ──────────────────────────────────────────────────
   field_counter <- reactiveVal(1L)
@@ -1198,12 +1227,8 @@ server <- function(input, output, session) {
         )
         updateNumericInput(session, "field_capacity", value = soil$field_capacity_in)
         updateNumericInput(session, "pwp", value = soil$pwp_in)
-        ssurgo_status(sprintf(
-          "Soil series: %s (mukey %s)\nRoot zone: %.1f ft\nFC: %.2f in  |  PWP: %.2f in\nAWC: %.2f in  |  50%% MAD (ref): %.2f in\n\nField capacity and PWP updated.\nAllowable dryness and initial water content were NOT changed\u2014set those based on management and current field conditions.",
-          soil$compname, soil$mukey, soil$rooting_depth_ft,
-          soil$field_capacity_in, soil$pwp_in,
-          soil$awc_in, soil$allowable_dryness_in
-        ))
+        ssurgo_result(soil)
+        ssurgo_status("ok")
       },
       error = function(e) ssurgo_status(paste("SSURGO error:", conditionMessage(e)))
     )
