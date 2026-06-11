@@ -1,6 +1,6 @@
 # OpenET Irrigation Scheduling Tool
 
-An R Shiny app for field-level irrigation scheduling. Tracks daily soil water balance using **OpenET** satellite ET, **SSURGO** soil properties, and an **Open-Meteo** 7-day ETo forecast to tell you when and how much to irrigate.
+An R Shiny app for field-level irrigation scheduling. Tracks daily soil water balance using **OpenET** remote sensing based ET, **SSURGO** soil properties, and an **Open-Meteo** 7-day ETo forecast to tell you when and how much to irrigate.
 
 ---
 
