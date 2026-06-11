@@ -629,7 +629,7 @@ ui <- fluidPage(
                     "data-toggle" = "collapse", "data-parent" = "#faq-accordion", href = "#faq8",
                     style = "text-decoration: none; color: inherit; display: block;",
                     tags$span(class = "pull-right", style = "font-size: 12px; color: #667085;", "▼"),
-                    "Where does the 7-day ETo forecast in the Irrigation Explorer come from?"
+                    "Where does the 7-day ETo forecast come from?"
                   )
                 )
               ),
