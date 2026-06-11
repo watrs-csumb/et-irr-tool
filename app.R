@@ -802,7 +802,7 @@ server <- function(input, output, session) {
   }
 
   restore_field <- function(fd) {
-    suppress_mismatch_notif(TRUE)
+    suppress_mismatch_until(as.numeric(Sys.time()) + 1.8)
     prev_mismatch(TRUE) # prevent popup firing on the newly loaded field
     s <- fd$setup
     updateTextInput(session, "field_id", value = s$field_id %||% "")
@@ -1273,7 +1273,7 @@ server <- function(input, output, session) {
 
   # Track previous mismatch state to only show notification when it newly becomes mismatched
   prev_mismatch <- reactiveVal(FALSE)
-  suppress_mismatch_notif <- reactiveVal(FALSE) # TRUE during field switches to suppress false alarms
+  suppress_mismatch_until <- reactiveVal(0) # timestamp: suppress inline alert until this time
 
   output$location_warning <- renderUI({
     loc <- openet_location()
@@ -1281,11 +1281,10 @@ server <- function(input, output, session) {
     if (is.na(loc$latitude)) {
       return(div(class = "warn-box", "OpenET has not been refreshed in this session. Click 'Update OpenET data' after setting the date range and coordinates."))
     }
-    # If a field switch just happened, hold off for 700ms then re-render normally.
-    if (isTRUE(suppress_mismatch_notif())) {
-      isolate(suppress_mismatch_notif(FALSE))
-      invalidateLater(1500)
-      return(div(class = "ok-box", "Switching field — please wait..."))
+    # Hold off showing the red box during a field switch (timestamp-based, survives multiple re-renders)
+    if (as.numeric(Sys.time()) < isolate(suppress_mismatch_until())) {
+      invalidateLater(300) # re-check every 300ms until suppress window expires
+      return(div(class = "ok-box", "Switching field \u2014 please wait..."))
     }
     coords_same <- isTRUE(all.equal(as.numeric(input$lat), loc$latitude, tolerance = 1e-7)) &&
       isTRUE(all.equal(as.numeric(input$lon), loc$longitude, tolerance = 1e-7))
