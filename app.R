@@ -1641,14 +1641,14 @@ server <- function(input, output, session) {
   # Auto-update filename input when field count changes
   observe({
     n <- length(fields_store())
-    default_name <- paste0("fields_", n, "_", format(Sys.Date(), "%m_%d_%Y"))
+    default_name <- paste0("fields_", n, "_", format(Sys.time(), "%m_%d_%Y_%H%M"))
     updateTextInput(session, "session_filename", value = default_name)
   })
 
   output$save_session <- downloadHandler(
     filename = function() {
       nm <- trimws(input$session_filename %||% "")
-      if (!nzchar(nm)) nm <- paste0("fields_", length(fields_store()), "_", format(Sys.Date(), "%m_%d_%Y"))
+      if (!nzchar(nm)) nm <- paste0("fields_", length(fields_store()), "_", format(Sys.time(), "%m_%d_%Y_%H%M"))
       # strip .rds if user typed it, we add it back
       nm <- sub("\\.rds$", "", nm, ignore.case = TRUE)
       paste0(nm, ".rds")
