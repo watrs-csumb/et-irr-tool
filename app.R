@@ -215,7 +215,7 @@ ui <- fluidPage(
           column(6, numericInput("lon", "Longitude", default_setup$longitude, step = 0.0001))
         ),
         actionButton("pick_coords", tagList(icon("map-marker-alt"), " Pick from map"),
-          class = "btn-sm btn-default btn-block", style = "margin-top: -4px; margin-bottom: 6px;"
+          class = "btn-primary btn-sm btn-block", style = "margin-top: -4px; margin-bottom: 6px;"
         )
       ),
       hr(),
@@ -842,15 +842,26 @@ server <- function(input, output, session) {
     ignoreInit = TRUE
   )
 
-  # Rename current field in dropdown when field_id text changes (debounced 600 ms)
+  # Keep store field_id in sync with input immediately (fixes race on field switch).
+  observeEvent(input$field_id,
+    {
+      key <- isolate(active_field_key())
+      store <- fields_store()
+      if (!is.null(store[[key]])) {
+        store[[key]]$setup$field_id <- input$field_id
+        fields_store(store)
+      }
+    },
+    ignoreInit = TRUE
+  )
+
+  # Update the dropdown label after the user stops typing (debounced 600 ms).
   field_id_d <- debounce(reactive(input$field_id), 600)
   observeEvent(field_id_d(),
     {
       key <- isolate(active_field_key())
       store <- fields_store()
       if (!is.null(store[[key]])) {
-        store[[key]]$setup$field_id <- field_id_d()
-        fields_store(store)
         updateSelectInput(session, "active_field_key",
           choices = field_choices(store), selected = key
         )
