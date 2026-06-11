@@ -570,14 +570,33 @@ ui <- fluidPage(
                 id = "faq5", class = "panel-collapse collapse",
                 tags$div(
                   class = "panel-body",
-                  p("When you click ", tags$b("Fetch Soil from SSURGO"), ", the app queries the dominant soil component at your coordinates and retrieves horizon-level data down to your specified root zone depth. The following steps are applied:"),
+                  p("When you click ", tags$b("Fetch Soil from SSURGO"), ", the app queries the dominant soil component at your coordinates and retrieves horizon-level data down to your specified root zone depth. FC and PWP are derived from SSURGO moisture retention values using these steps:"),
                   tags$ol(
-                    tags$li(tags$b("Horizon clipping:"), " Only horizons within the root zone depth are used. The bottom of the deepest horizon is clipped to the root zone depth."),
-                    tags$li(tags$b("Gravimetric to volumetric conversion:"), " SSURGO reports moisture at field capacity (1/3 bar, ", tags$code("wthirdbar_r"), ") and permanent wilting point (15 bar, ", tags$code("wfifteenbar_r"), ") as % by weight. These are converted to volumetric fractions (cm³ water / cm³ soil) by multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³)."),
-                    tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons within the root zone."),
-                    tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
-                    tags$li(tags$b("Allowable depletion:"), " Set at 50% management allowed depletion (MAD) above the permanent wilting point: ", tags$code("Allowable depletion = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
-                    tags$li(tags$b("Available Water Capacity (AWC):"), " Defined as ", tags$code("AWC = FC − PWP"), " — the water held loosely enough for roots to extract, but tightly enough not to drain. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm and used without conversion. Multiplied by root zone depth it gives inches of plant-available water.")
+                    tags$li(
+                      tags$b("Read SSURGO moisture values:"),
+                      " For each soil horizon, SSURGO provides moisture content at two standard tensions:",
+                      tags$ul(
+                        style = "margin-top: 4px;",
+                        tags$li(tags$b("Field Capacity (FC)"), " — moisture retained at 1/3 bar suction (", tags$code("wthirdbar_r"), ", % by weight). This is the upper limit of plant-available water after free drainage stops."),
+                        tags$li(tags$b("Permanent Wilting Point (PWP)"), " — moisture retained at 15 bar suction (", tags$code("wfifteenbar_r"), ", % by weight). Below this point roots can no longer extract water.")
+                      )
+                    ),
+                    tags$li(
+                      tags$b("Convert % by weight → volumetric fraction:"),
+                      " SSURGO moisture values are gravimetric (g water / g soil). Multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³) converts them to volumetric fractions (cm³ water / cm³ soil):",
+                      tags$p(tags$code("FC_vol = (wthirdbar_r / 100) × dbthirdbar_r"), style = "margin: 4px 0 0 16px;"),
+                      tags$p(tags$code("PWP_vol = (wfifteenbar_r / 100) × dbthirdbar_r"), style = "margin: 4px 0 0 16px;")
+                    ),
+                    tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons clipped to the root zone depth. Horizons that extend below the root zone are trimmed to it."),
+                    tags$li(
+                      tags$b("Convert to inches of water:"),
+                      " The average volumetric fraction is multiplied by the root zone depth in inches:",
+                      tags$p(tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), style = "margin: 4px 0 0 16px;"),
+                      tags$p(tags$code("PWP (in.) = PWP_vol (cm³/cm³) × root zone depth (in.)"), style = "margin: 4px 0 0 16px;"),
+                      " This works because cm³/cm³ is dimensionless — equivalent to inches of water per inch of depth."
+                    ),
+                    tags$li(tags$b("Available Water Capacity (AWC):"), " The difference between FC and PWP — the water available for plant uptake: ", tags$code("AWC = FC − PWP"), ". SSURGO also reports this directly as ", tags$code("awc_r"), " (cm/cm), which is used as a cross-check."),
+                    tags$li(tags$b("Allowable depletion:"), " Set at 50% MAD: ", tags$code("Allowable depletion = FC − 0.5 × AWC"), ". Irrigation is recommended when soil water falls to this level.")
                   )
                 )
               )
