@@ -227,7 +227,7 @@ ui <- fluidPage(
         br(),
         numericInput("app_rate", "Net application rate, in/hr", default_setup$application_rate_in_hr, step = 0.0001),
         numericInput("initial_water", "Initial water content, in.", default_setup$initial_water_content_in, step = 0.1),
-        numericInput("allowable_dryness", HTML("Allowable dryness, in."), default_setup$allowable_dryness_in, step = 0.1),
+        numericInput("allowable_dryness", HTML("Allowable depletion, in."), default_setup$allowable_dryness_in, step = 0.1),
         numericInput("field_capacity", HTML("Field capacity*, in."), default_setup$field_capacity_in, step = 0.1),
         numericInput("pwp", HTML("Permanent wilting point*, in."), default_setup$permanent_wilting_point_in, step = 0.1),
         tags$p(tags$em("* Can be updated using SSURGO"), style = "font-size: 11px; color: #4a6a8a; margin-top: 6px; margin-bottom: 2px;")
@@ -576,7 +576,7 @@ ui <- fluidPage(
                     tags$li(tags$b("Gravimetric to volumetric conversion:"), " SSURGO reports moisture at field capacity (1/3 bar, ", tags$code("wthirdbar_r"), ") and permanent wilting point (15 bar, ", tags$code("wfifteenbar_r"), ") as % by weight. These are converted to volumetric fractions (cm³ water / cm³ soil) by multiplying by bulk density (", tags$code("dbthirdbar_r"), ", g/cm³)."),
                     tags$li(tags$b("Depth-weighted average:"), " A thickness-weighted average volumetric fraction is computed across all horizons within the root zone."),
                     tags$li(tags$b("Conversion to inches:"), " The average volumetric fraction is multiplied by the total root zone depth in inches: ", tags$code("FC (in.) = FC_vol (cm³/cm³) × root zone depth (in.)"), ". This is valid because cm³/cm³ is dimensionless — it equals inches of water per inch of depth — so the result is water depth in inches."),
-                    tags$li(tags$b("Allowable dryness:"), " Set at 50% management allowed depletion (MAD) above the permanent wilting point: ", tags$code("Allowable dryness = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
+                    tags$li(tags$b("Allowable depletion:"), " Set at 50% management allowed depletion (MAD) above the permanent wilting point: ", tags$code("Allowable depletion = FC − 0.5 × AWC"), ", where AWC is the available water capacity."),
                     tags$li(tags$b("Available Water Capacity (AWC):"), " Defined as ", tags$code("AWC = FC − PWP"), " — the water held loosely enough for roots to extract, but tightly enough not to drain. In SSURGO, AWC is reported directly as ", tags$code("awc_r"), " in cm/cm and used without conversion. Multiplied by root zone depth it gives inches of plant-available water.")
                   )
                 )
@@ -604,7 +604,7 @@ ui <- fluidPage(
                   p(tags$b("Soil water balance")),
                   p("The balance tracks daily soil water content using:"),
                   tags$p(tags$code("SWC = SWC_prev + Irrigation + Effective Precipitation − ETa"), style = "margin-left: 16px;"),
-                  p("An irrigation event is suggested when soil water drops to or below the allowable dryness (MAD) threshold. Soil water is capped at field capacity — any water in excess drains as deep percolation."),
+                  p("An irrigation event is suggested when soil water drops to or below the allowable depletion (MAD) threshold. Soil water is capped at field capacity — any water in excess drains as deep percolation."),
                   hr(style = "margin: 10px 0;"),
                   p(tags$b("Deep percolation")),
                   p("Deep percolation is the water that drains below the root zone on days when the computed soil water would exceed field capacity:"),
@@ -763,7 +763,7 @@ server <- function(input, output, session) {
           p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity and PWP updated."),
           p(
             style = "color: #667085; font-size: 11px; margin: 4px 0 0;",
-            tags$em("Allowable dryness and initial water content were not changed \u2014 set those based on management and current field conditions.")
+            tags$em("Allowable depletion and initial water content were not changed \u2014 set those based on management and current field conditions.")
           )
         ))
       }
@@ -1065,7 +1065,7 @@ server <- function(input, output, session) {
     )
     shinyFeedback::feedbackWarning("allowable_dryness",
       show = isTRUE(ad < pwp || ad > fc),
-      text = "Allowable dryness should be between PWP and field capacity"
+      text = "Allowable depletion should be between PWP and field capacity"
     )
     shinyFeedback::feedbackDanger("pwp",
       show = isTRUE(pwp >= fc),
@@ -1391,13 +1391,13 @@ server <- function(input, output, session) {
       geom_point(aes(y = precip_plot_in, color = "Precipitation, in."), shape = 21, size = 3, fill = "#90CAF9", alpha = 0.85, na.rm = TRUE) +
       geom_point(aes(y = applied_plot_in, color = "Applied Water Event, in."), size = 3, shape = 24, na.rm = TRUE) +
       geom_line(aes(y = field_capacity_in, color = "Field Capacity, in."), linetype = "dashed", linewidth = 0.8) +
-      geom_line(aes(y = allowable_dryness_in, color = "Allowable Dryness, in."), linetype = "dashed", linewidth = 0.8) +
+      geom_line(aes(y = allowable_dryness_in, color = "Allowable Depletion, in."), linetype = "dashed", linewidth = 0.8) +
       geom_line(aes(y = permanent_wilting_point_in, color = "Perm. Wilting Point, in."), linetype = "dashed", linewidth = 0.8) +
       geom_line(aes(y = soil_water_graph_in, color = "Soil Water Content, in."), linewidth = 1.1) +
       scale_color_manual(values = c(
         "Soil Water Content, in." = "#1565C0",
         "Field Capacity, in." = "#2E7D32",
-        "Allowable Dryness, in." = "#F57F17",
+        "Allowable Depletion, in." = "#F57F17",
         "Perm. Wilting Point, in." = "#C62828",
         "Applied Water Event, in." = "#0288D1",
         "Precipitation, in." = "#42A5F5"
@@ -1560,7 +1560,7 @@ server <- function(input, output, session) {
       applied_minus_eta_in = "Σ Applied − Σ ETa",
       soil_water_content_in = "Soil Water Content, in.",
       field_capacity_in = "Field Capacity, in.",
-      allowable_dryness_in = "Allowable Dryness, in.",
+      allowable_dryness_in = "Allowable Depletion, in.",
       permanent_wilting_point_in = "Perm. Wilting Point, in.",
       soil_water_graph_in = "Soil Water (chart), in.",
       questionable_soil_water_in = "Questionable Soil Water",

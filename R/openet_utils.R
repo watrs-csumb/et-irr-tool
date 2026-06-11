@@ -527,7 +527,7 @@ write_balance_export <- function(balance, irrigation, openet, setup, path) {
   wb <- openxlsx::createWorkbook()
   for (s in c("Initial_Setup", "Irrigation Amounts", "OpenET", "Calcs", "Summary")) openxlsx::addWorksheet(wb, s)
   setup_df <- data.frame(
-    item = c("Field ID", "Crop", "Start date", "End date", "Latitude", "Longitude", "Application rate in/hr", "Field capacity", "Initial water", "Allowable dryness", "Permanent wilting point", "Selected model"),
+    item = c("Field ID", "Crop", "Start date", "End date", "Latitude", "Longitude", "Application rate in/hr", "Field capacity", "Initial water", "Allowable depletion", "Permanent wilting point", "Selected model"),
     value = c(setup$field_id, setup$crop_description, as.character(setup$start_date), as.character(setup$end_date), setup$latitude, setup$longitude, setup$application_rate_in_hr, setup$field_capacity_in, setup$initial_water_content_in, setup$allowable_dryness_in, setup$permanent_wilting_point_in, setup$selected_model),
     stringsAsFactors = FALSE
   )
