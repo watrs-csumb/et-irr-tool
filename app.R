@@ -192,12 +192,31 @@ ui <- fluidPage(
   ),
   sidebarLayout(
     sidebarPanel(
-      textInput("field_id", "Field ID", default_setup$field_id),
-      textInput("crop", "Crop description", default_setup$crop_description),
-      dateRangeInput("date_range", "Date range", start = default_setup$start_date, end = default_setup$end_date),
-      fluidRow(
-        column(6, numericInput("lat", "Latitude", default_setup$latitude, step = 0.0001)),
-        column(6, numericInput("lon", "Longitude", default_setup$longitude, step = 0.0001))
+      div(
+        style = "margin-bottom: 4px;",
+        div(
+          style = "display: flex; align-items: center; gap: 4px; margin-bottom: 4px;",
+          tags$label("Fields", style = "font-weight: 600; font-size: 14px; color: #0d1f33; margin: 0; flex: 1;"),
+          actionButton("add_field", tagList(icon("plus"), " Add field"), class = "btn-xs btn-primary", title = "Add new field", style = "padding: 2px 8px;"),
+          actionButton("delete_field", tagList(icon("trash"), " Delete field"), class = "btn-xs btn-danger", title = "Remove current field", style = "padding: 2px 8px;")
+        ),
+        selectInput("active_field_key", NULL, choices = c("Example" = "field_1"), width = "100%")
+      ),
+      hr(),
+      tags$details(
+        open = NA,
+        tags$summary(tags$b("Field Info")),
+        br(),
+        textInput("field_id", "Field ID", default_setup$field_id),
+        textInput("crop", "Crop description", default_setup$crop_description),
+        dateRangeInput("date_range", "Date range", start = default_setup$start_date, end = default_setup$end_date),
+        fluidRow(
+          column(6, numericInput("lat", "Latitude", default_setup$latitude, step = 0.0001)),
+          column(6, numericInput("lon", "Longitude", default_setup$longitude, step = 0.0001))
+        ),
+        actionButton("pick_coords", tagList(icon("map-marker-alt"), " Pick from map"),
+          class = "btn-sm btn-default btn-block", style = "margin-top: -4px; margin-bottom: 6px;"
+        )
       ),
       hr(),
       tags$details(
@@ -713,6 +732,220 @@ server <- function(input, output, session) {
 
   output$openet_status <- renderText(openet_status())
   output$ssurgo_status <- renderText(ssurgo_status())
+
+  # ── Multi-field management ──────────────────────────────────────────────────
+  field_counter <- reactiveVal(1L)
+  fields_store <- reactiveVal(list(
+    field_1 = list(
+      setup = list(
+        field_id               = default_setup$field_id,
+        crop                   = default_setup$crop_description,
+        date_range             = c(default_setup$start_date, default_setup$end_date),
+        lat                    = default_setup$latitude,
+        lon                    = default_setup$longitude,
+        app_rate               = default_setup$application_rate_in_hr,
+        initial_water          = default_setup$initial_water_content_in,
+        allowable_dryness      = default_setup$allowable_dryness_in,
+        field_capacity         = default_setup$field_capacity_in,
+        pwp                    = default_setup$permanent_wilting_point_in,
+        root_depth_ft          = 2.0,
+        openet_model           = default_setup$selected_model,
+        download_all_models    = default_setup$download_all_models,
+        count_precip_effective = default_setup$count_precip_effective
+      ),
+      irrigation_data = NULL,
+      openet_data = NULL,
+      eto_data = NULL,
+      openet_location = list(latitude = NA_real_, longitude = NA_real_, start_date = NA, end_date = NA),
+      openet_status_text = "No OpenET API request made yet.",
+      ssurgo_status_text = ""
+    )
+  ))
+  active_field_key <- reactiveVal("field_1")
+
+  field_choices <- function(store) {
+    if (length(store) == 0) {
+      return(c("Example" = "field_1"))
+    }
+    ids <- vapply(names(store), function(k) store[[k]]$setup$field_id %||% k, character(1))
+    setNames(names(store), ids)
+  }
+
+  capture_current_field <- function() {
+    list(
+      setup = list(
+        field_id               = isolate(input$field_id),
+        crop                   = isolate(input$crop),
+        date_range             = isolate(input$date_range),
+        lat                    = isolate(input$lat),
+        lon                    = isolate(input$lon),
+        app_rate               = isolate(input$app_rate),
+        initial_water          = isolate(input$initial_water),
+        allowable_dryness      = isolate(input$allowable_dryness),
+        field_capacity         = isolate(input$field_capacity),
+        pwp                    = isolate(input$pwp),
+        root_depth_ft          = isolate(input$root_depth_ft),
+        openet_model           = isolate(input$openet_model),
+        download_all_models    = isolate(input$download_all_models),
+        count_precip_effective = isolate(input$count_precip_effective)
+      ),
+      irrigation_data = isolate(irrigation_data()),
+      openet_data = isolate(openet_data()),
+      eto_data = isolate(eto_data()),
+      openet_location = isolate(openet_location()),
+      openet_status_text = isolate(openet_status()),
+      ssurgo_status_text = isolate(ssurgo_status())
+    )
+  }
+
+  restore_field <- function(fd) {
+    s <- fd$setup
+    updateTextInput(session, "field_id", value = s$field_id %||% "")
+    updateTextInput(session, "crop", value = s$crop %||% "")
+    updateDateRangeInput(session, "date_range",
+      start = as.Date(s$date_range[1]), end = as.Date(s$date_range[2])
+    )
+    updateNumericInput(session, "lat", value = s$lat)
+    updateNumericInput(session, "lon", value = s$lon)
+    updateNumericInput(session, "app_rate", value = s$app_rate)
+    updateNumericInput(session, "initial_water", value = s$initial_water)
+    updateNumericInput(session, "allowable_dryness", value = s$allowable_dryness)
+    updateNumericInput(session, "field_capacity", value = s$field_capacity)
+    updateNumericInput(session, "pwp", value = s$pwp)
+    updateNumericInput(session, "root_depth_ft", value = s$root_depth_ft %||% 2.0)
+    updateSelectInput(session, "openet_model", selected = s$openet_model %||% "ENSEMBLE")
+    updateCheckboxInput(session, "download_all_models", value = isTRUE(s$download_all_models))
+    updateCheckboxInput(session, "count_precip_effective", value = isTRUE(s$count_precip_effective))
+    if (!is.null(fd$irrigation_data)) irrigation_data(fd$irrigation_data)
+    if (!is.null(fd$openet_data)) openet_data(fd$openet_data)
+    eto_data(fd$eto_data)
+    openet_location(fd$openet_location)
+    openet_status(fd$openet_status_text %||% "No OpenET API request made yet.")
+    ssurgo_status(fd$ssurgo_status_text %||% "")
+    irrig_version(irrig_version() + 1L)
+  }
+
+  # Switch active field: save current state, then restore selected field
+  observeEvent(input$active_field_key,
+    {
+      new_key <- input$active_field_key
+      cur_key <- isolate(active_field_key())
+      if (identical(new_key, cur_key)) {
+        return()
+      }
+      store <- fields_store()
+      store[[cur_key]] <- capture_current_field()
+      fields_store(store)
+      active_field_key(new_key)
+      if (!is.null(store[[new_key]])) restore_field(store[[new_key]])
+    },
+    ignoreInit = TRUE
+  )
+
+  # Rename current field in dropdown when field_id text changes (debounced 600 ms)
+  field_id_d <- debounce(reactive(input$field_id), 600)
+  observeEvent(field_id_d(),
+    {
+      key <- isolate(active_field_key())
+      store <- fields_store()
+      if (!is.null(store[[key]])) {
+        store[[key]]$setup$field_id <- field_id_d()
+        fields_store(store)
+        updateSelectInput(session, "active_field_key",
+          choices = field_choices(store), selected = key
+        )
+      }
+    },
+    ignoreInit = TRUE
+  )
+
+  # Add new field
+  observeEvent(input$add_field, {
+    showModal(modalDialog(
+      title = "Add New Field",
+      textInput("new_field_name", "Field ID / Name", placeholder = "e.g. West Block"),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_add_field", "Add", class = "btn-primary")
+      ),
+      size = "s", easyClose = TRUE
+    ))
+  })
+
+  observeEvent(input$confirm_add_field, {
+    new_name <- trimws(input$new_field_name %||% "")
+    if (!nzchar(new_name)) {
+      return()
+    }
+    store <- fields_store()
+    cur_key <- isolate(active_field_key())
+    store[[cur_key]] <- capture_current_field()
+    n <- field_counter() + 1L
+    field_counter(n)
+    new_key <- paste0("field_", n)
+    store[[new_key]] <- list(
+      setup = list(
+        field_id = new_name, crop = "",
+        date_range = c(default_start, default_end),
+        lat = default_setup$latitude,
+        lon = default_setup$longitude,
+        app_rate = default_setup$application_rate_in_hr,
+        initial_water = default_setup$initial_water_content_in,
+        allowable_dryness = default_setup$allowable_dryness_in,
+        field_capacity = default_setup$field_capacity_in,
+        pwp = default_setup$permanent_wilting_point_in,
+        root_depth_ft = 2.0,
+        openet_model = "ENSEMBLE",
+        download_all_models = FALSE,
+        count_precip_effective = FALSE
+      ),
+      irrigation_data = make_default_irrigation_range(default_start, default_end),
+      openet_data = make_empty_openet_range(default_start, default_end),
+      eto_data = NULL,
+      openet_location = list(latitude = NA_real_, longitude = NA_real_, start_date = NA, end_date = NA),
+      openet_status_text = "No OpenET API request made yet.",
+      ssurgo_status_text = ""
+    )
+    fields_store(store)
+    active_field_key(new_key)
+    updateSelectInput(session, "active_field_key",
+      choices = field_choices(store), selected = new_key
+    )
+    restore_field(store[[new_key]])
+    removeModal()
+  })
+
+  # Remove current field
+  observeEvent(input$delete_field, {
+    if (length(fields_store()) <= 1) {
+      showNotification("Cannot remove the only field.", type = "warning")
+      return()
+    }
+    showModal(modalDialog(
+      title = "Remove Field",
+      p(HTML(paste0('Remove field "<b>', isolate(input$field_id), '</b>"? All unsaved data for this field will be lost.'))),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_delete_field", "Remove", class = "btn-danger")
+      ),
+      size = "s", easyClose = TRUE
+    ))
+  })
+
+  observeEvent(input$confirm_delete_field, {
+    store <- fields_store()
+    del_key <- isolate(active_field_key())
+    store[[del_key]] <- NULL
+    fields_store(store)
+    remaining <- names(store)
+    new_key <- remaining[1]
+    active_field_key(new_key)
+    updateSelectInput(session, "active_field_key",
+      choices = field_choices(store), selected = new_key
+    )
+    restore_field(store[[new_key]])
+    removeModal()
+  })
 
   setup_values <- reactive({
     list(
@@ -1278,6 +1511,60 @@ server <- function(input, output, session) {
       formatRound(columns = names(df)[vapply(df, is.numeric, logical(1))], digits = 4)
   })
 
+  # ── Coordinate picker map ─────────────────────────────────────────────────────
+  observeEvent(input$pick_coords, {
+    lat0 <- isolate(input$lat) %||% default_setup$latitude
+    lon0 <- isolate(input$lon) %||% default_setup$longitude
+    showModal(modalDialog(
+      title = "Pick field coordinates",
+      p(class = "help-text", "Click anywhere on the map to set latitude and longitude. The marker will move to your click."),
+      uiOutput("picker_coords_display"),
+      leafletOutput("picker_map", height = 420),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_coords", "Use these coordinates", class = "btn-primary")
+      ),
+      size = "l", easyClose = FALSE
+    ))
+    output$picker_map <- renderLeaflet({
+      leaflet() |>
+        addProviderTiles(providers$Esri.WorldImagery) |>
+        setView(lng = lon0, lat = lat0, zoom = 14) |>
+        addMarkers(lng = lon0, lat = lat0, layerId = "picked")
+    })
+    output$picker_coords_display <- renderUI({
+      click <- input$picker_map_click
+      if (is.null(click)) {
+        div(
+          style = "font-size: 13px; color: #667085; margin-bottom: 6px;",
+          sprintf("Current: %.5f, %.5f — click the map to change.", lat0, lon0)
+        )
+      } else {
+        div(
+          style = "font-size: 13px; color: #388E3C; margin-bottom: 6px;",
+          icon("check-circle"),
+          sprintf(" Selected: %.5f N, %.5f E", click$lat, click$lng)
+        )
+      }
+    })
+  })
+
+  observeEvent(input$picker_map_click, {
+    click <- input$picker_map_click
+    leafletProxy("picker_map") |>
+      clearMarkers() |>
+      addMarkers(lng = click$lng, lat = click$lat, layerId = "picked")
+  })
+
+  observeEvent(input$confirm_coords, {
+    click <- input$picker_map_click
+    if (!is.null(click)) {
+      updateNumericInput(session, "lat", value = round(click$lat, 5))
+      updateNumericInput(session, "lon", value = round(click$lng, 5))
+    }
+    removeModal()
+  })
+
   output$field_map <- renderLeaflet({
     leaflet() |>
       addProviderTiles(providers$Esri.WorldImagery) |>
@@ -1305,31 +1592,16 @@ server <- function(input, output, session) {
   output$save_session <- downloadHandler(
     filename = function() paste0("session_", input$field_id, "_", format(Sys.time(), "%m_%d_%Y_%H%M"), ".rds"),
     content = function(file) {
-      session_data <- list(
-        version = 1L,
-        saved_at = Sys.time(),
-        setup = list(
-          field_id = input$field_id,
-          crop = input$crop,
-          date_range = input$date_range,
-          lat = input$lat,
-          lon = input$lon,
-          app_rate = input$app_rate,
-          initial_water = input$initial_water,
-          allowable_dryness = input$allowable_dryness,
-          field_capacity = input$field_capacity,
-          pwp = input$pwp,
-          root_depth_ft = input$root_depth_ft,
-          openet_model = input$openet_model,
-          download_all_models = input$download_all_models,
-          count_precip_effective = input$count_precip_effective
-        ),
-        irrigation_data = irrigation_data(),
-        openet_data = openet_data(),
-        eto_data = eto_data(),
-        openet_location = openet_location()
-      )
-      saveRDS(session_data, file)
+      store <- fields_store()
+      cur_key <- active_field_key()
+      store[[cur_key]] <- capture_current_field()
+      saveRDS(list(
+        version          = 2L,
+        saved_at         = Sys.time(),
+        fields_store     = store,
+        active_field_key = cur_key,
+        field_counter    = field_counter()
+      ), file)
     }
   )
 
@@ -1351,27 +1623,54 @@ server <- function(input, output, session) {
     tryCatch(
       {
         sd <- readRDS(input$load_session$datapath)
-        s <- sd$setup
-        updateTextInput(session, "field_id", value = s$field_id)
-        updateTextInput(session, "crop", value = s$crop)
-        updateDateRangeInput(session, "date_range", start = as.Date(s$date_range[1]), end = as.Date(s$date_range[2]))
-        updateNumericInput(session, "lat", value = s$lat)
-        updateNumericInput(session, "lon", value = s$lon)
-        updateNumericInput(session, "app_rate", value = s$app_rate)
-        updateNumericInput(session, "initial_water", value = s$initial_water)
-        updateNumericInput(session, "allowable_dryness", value = s$allowable_dryness)
-        updateNumericInput(session, "field_capacity", value = s$field_capacity)
-        updateNumericInput(session, "pwp", value = s$pwp)
-        updateNumericInput(session, "root_depth_ft", value = s$root_depth_ft %||% 4.0)
-        updateSelectInput(session, "openet_model", selected = s$openet_model)
-        updateCheckboxInput(session, "download_all_models", value = isTRUE(s$download_all_models))
-        updateCheckboxInput(session, "count_precip_effective", value = isTRUE(s$count_precip_effective))
-        irrigation_data(sd$irrigation_data)
-        openet_data(sd$openet_data)
-        eto_data(sd$eto_data)
-        openet_location(sd$openet_location)
-        irrig_version(irrig_version() + 1L)
-        session_msg(paste0("Session loaded: ", s$field_id, " (saved ", format(sd$saved_at, "%b %d %Y %H:%M"), ")"))
+        if (isTRUE(sd$version >= 2L) && !is.null(sd$fields_store)) {
+          # v2: multi-field session
+          store <- sd$fields_store
+          cur_key <- sd$active_field_key %||% names(store)[1]
+          if (!is.null(sd$field_counter)) field_counter(sd$field_counter)
+          fields_store(store)
+          active_field_key(cur_key)
+          updateSelectInput(session, "active_field_key",
+            choices = field_choices(store), selected = cur_key
+          )
+          restore_field(store[[cur_key]])
+          session_msg(paste0(
+            "Session loaded: ", length(store), " field(s) — active: ",
+            store[[cur_key]]$setup$field_id,
+            " (saved ", format(sd$saved_at, "%b %d %Y %H:%M"), ")"
+          ))
+        } else {
+          # v1: legacy single-field session
+          s <- sd$setup
+          fd <- list(
+            setup = list(
+              field_id = s$field_id, crop = s$crop,
+              date_range = s$date_range, lat = s$lat, lon = s$lon,
+              app_rate = s$app_rate, initial_water = s$initial_water,
+              allowable_dryness = s$allowable_dryness,
+              field_capacity = s$field_capacity, pwp = s$pwp,
+              root_depth_ft = s$root_depth_ft %||% 4.0,
+              openet_model = s$openet_model,
+              download_all_models = s$download_all_models,
+              count_precip_effective = s$count_precip_effective
+            ),
+            irrigation_data = sd$irrigation_data,
+            openet_data = sd$openet_data,
+            eto_data = sd$eto_data,
+            openet_location = sd$openet_location,
+            openet_status_text = "Session loaded.",
+            ssurgo_status_text = ""
+          )
+          store <- list(field_1 = fd)
+          field_counter(1L)
+          fields_store(store)
+          active_field_key("field_1")
+          updateSelectInput(session, "active_field_key",
+            choices = field_choices(store), selected = "field_1"
+          )
+          restore_field(fd)
+          session_msg(paste0("Session loaded: ", s$field_id, " (saved ", format(sd$saved_at, "%b %d %Y %H:%M"), ")"))
+        }
       },
       error = function(e) {
         session_msg(paste("Error loading session:", conditionMessage(e)))
