@@ -257,6 +257,7 @@ ui <- fluidPage(
         tags$summary(tags$b("Session")),
         br(),
         p(class = "help-text", "Save your current session (setup, irrigation entries, and ET data) to a file and reload it later."),
+        textInput("session_filename", "File name", "", placeholder = "auto-generated"),
         downloadButton("save_session", "Save Session", class = "btn-sm btn-default"),
         br(), br(),
         fileInput("load_session", "Load Session",
@@ -1637,8 +1638,21 @@ server <- function(input, output, session) {
 
   # ── Download metadata ─────────────────────────────────────────────────────
   # ── Save session ──────────────────────────────────────────────────────────
+  # Auto-update filename input when field count changes
+  observe({
+    n <- length(fields_store())
+    default_name <- paste0("fields_", n, "_", format(Sys.Date(), "%m_%d_%Y"))
+    updateTextInput(session, "session_filename", value = default_name)
+  })
+
   output$save_session <- downloadHandler(
-    filename = function() paste0("session_", input$field_id, "_", format(Sys.time(), "%m_%d_%Y_%H%M"), ".rds"),
+    filename = function() {
+      nm <- trimws(input$session_filename %||% "")
+      if (!nzchar(nm)) nm <- paste0("fields_", length(fields_store()), "_", format(Sys.Date(), "%m_%d_%Y"))
+      # strip .rds if user typed it, we add it back
+      nm <- sub("\\.rds$", "", nm, ignore.case = TRUE)
+      paste0(nm, ".rds")
+    },
     content = function(file) {
       store <- fields_store()
       cur_key <- active_field_key()
