@@ -155,6 +155,7 @@ body { background-color: #f5f7fb; }
 .metric .label { color: #667085; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
 .metric .value { font-size: 28px; font-weight: 700; margin-top: 5px; }
 .warn-box { background: #fff7e6; border: 1px solid #ffd591; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+.red-box { background: #fde8e8; border: 1px solid #f5a0a0; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; color: #7b1212; font-weight: 500; }
 .ok-box { background: #ecfdf3; border: 1px solid #abefc6; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
 .help-text { color: #667085; font-size: 13px; }
 .well { background-color: #C5D178 !important; border: none !important; box-shadow: none !important; }
@@ -174,7 +175,9 @@ body { background-color: #f5f7fb; }
   .metric .value { font-size: 22px; }
   .navbar-fixed-top { position: relative; }
 }
-.shiny-notification { border-radius: 10px; }
+.shiny-notification { border-radius: 10px; min-width: 300px; max-width: 380px; right: 16px !important; bottom: 16px !important; }
+.shiny-notification.shiny-notification-warning { background-color: #c0392b !important; color: #fff !important; border: none !important; }
+.shiny-notification.shiny-notification-warning .shiny-notification-close { color: #fff !important; }
 "
 
 ui <- fluidPage(
@@ -799,6 +802,8 @@ server <- function(input, output, session) {
   }
 
   restore_field <- function(fd) {
+    suppress_mismatch_notif(TRUE)
+    prev_mismatch(TRUE) # prevent popup firing on the newly loaded field
     s <- fd$setup
     updateTextInput(session, "field_id", value = s$field_id %||% "")
     updateTextInput(session, "crop", value = s$crop %||% "")
@@ -1266,16 +1271,49 @@ server <- function(input, output, session) {
   output$deep_title <- renderText(sprintf("Deep Percolation & Leaching Fraction — %s @ %s", input$crop, input$field_id))
   output$kc_title <- renderText(sprintf("Daily ET, ETo & ET/ETo — %s @ %s", input$crop, input$field_id))
 
+  # Track previous mismatch state to only show notification when it newly becomes mismatched
+  prev_mismatch <- reactiveVal(FALSE)
+  suppress_mismatch_notif <- reactiveVal(FALSE) # TRUE during field switches to suppress false alarms
+
   output$location_warning <- renderUI({
     loc <- openet_location()
     s <- setup_values()
     if (is.na(loc$latitude)) {
       return(div(class = "warn-box", "OpenET has not been refreshed in this session. Click 'Update OpenET data' after setting the date range and coordinates."))
     }
-    same <- isTRUE(all.equal(as.numeric(input$lat), loc$latitude, tolerance = 1e-7)) &&
-      isTRUE(all.equal(as.numeric(input$lon), loc$longitude, tolerance = 1e-7)) &&
-      identical(as.Date(s$start_date), as.Date(loc$start_date)) && identical(as.Date(s$end_date), as.Date(loc$end_date))
-    if (same) div(class = "ok-box", sprintf("OpenET data match setup: %.5f, %.5f from %s to %s", loc$latitude, loc$longitude, as.Date(loc$start_date), as.Date(loc$end_date))) else div(class = "warn-box", "Date range or coordinates changed. Click 'Update OpenET data' to refresh the API results.")
+    # If a field switch just happened, hold off for 700ms then re-render normally.
+    if (isTRUE(suppress_mismatch_notif())) {
+      isolate(suppress_mismatch_notif(FALSE))
+      invalidateLater(1500)
+      return(div(class = "ok-box", "Switching field — please wait..."))
+    }
+    coords_same <- isTRUE(all.equal(as.numeric(input$lat), loc$latitude, tolerance = 1e-7)) &&
+      isTRUE(all.equal(as.numeric(input$lon), loc$longitude, tolerance = 1e-7))
+    dates_same <- identical(as.Date(s$start_date), as.Date(loc$start_date)) &&
+      identical(as.Date(s$end_date), as.Date(loc$end_date))
+    if (coords_same && dates_same) {
+      prev_mismatch(FALSE)
+      return(div(class = "ok-box", sprintf(
+        "OpenET data match setup: %.5f, %.5f from %s to %s",
+        loc$latitude, loc$longitude, as.Date(loc$start_date), as.Date(loc$end_date)
+      )))
+    }
+    what_changed <- if (!coords_same && !dates_same) {
+      "Coordinates and date range have changed"
+    } else if (!coords_same) {
+      "Coordinates have changed"
+    } else {
+      "Date range has changed"
+    }
+    msg <- paste0(what_changed, " since the last OpenET fetch. Click \u2018Update OpenET data\u2019 to refresh.")
+    if (!isTRUE(prev_mismatch())) {
+      showNotification(
+        tagList(icon("exclamation-triangle"), " ", msg),
+        type = "warning", duration = 8, closeButton = TRUE
+      )
+      prev_mismatch(TRUE)
+    }
+    div(class = "red-box", icon("exclamation-triangle"), " ", msg)
   })
 
   output$eta_plot <- renderPlotly({
