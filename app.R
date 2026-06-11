@@ -1864,8 +1864,8 @@ server <- function(input, output, session) {
         )
       } else if (days_stale <= 4) {
         div(
-          style = "margin-bottom: 8px; font-size: 13px; color: #667085;",
-          icon("info-circle"),
+          style = "margin-bottom: 8px; font-size: 13px; color: #C62828;",
+          icon("exclamation-triangle"),
           sprintf(
             " The forecast starts from the last date in your soil water balance data (%s, %d days ago). Soil water content may not reflect current conditions.",
             last_str, days_stale
