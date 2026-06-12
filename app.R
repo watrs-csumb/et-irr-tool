@@ -384,7 +384,7 @@ ui <- fluidPage(
             actionButton("print_summary", "Print / Save PDF",
               onclick = "window.print();"
             ),
-            checkboxInput("summary_include_map", "Show map and include in print", value = TRUE)
+            checkboxInput("summary_include_map", "Show map and include in print", value = FALSE)
           ),
           div(
             class = "wet-card",
