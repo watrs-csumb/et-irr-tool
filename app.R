@@ -198,7 +198,7 @@ ui <- fluidPage(
   tags$div(
     style = "position: fixed; top: 12px; right: 18px; z-index: 9999;",
     actionButton("show_help",
-      label = "?", title = "How to use this app",
+      label = "?", title = "How to use this explorer",
       style = "border-radius: 50%; width: 34px; height: 34px; padding: 0;
                font-weight: 700; font-size: 16px;
                background-color: #2e86c1; color: #fff; border: none;
