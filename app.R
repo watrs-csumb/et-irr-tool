@@ -1859,7 +1859,6 @@ server <- function(input, output, session) {
             var stale = parseInt(d[ncols - 1]);
             if (!isNaN(stale) && stale >= 2) {
               $(this.node()).css('background-color', '#fde8e8');
-              $(this.node()).find('td').css({'color': '#c0392b', 'font-weight': '600'});
             }
           });
         }
