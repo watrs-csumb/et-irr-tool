@@ -181,11 +181,13 @@ body { background-color: #f5f7fb; }
 @media print {
   .well, .navbar, .navbar-fixed-top, #show_help, .shiny-notification,
   .nav.nav-tabs, button, .btn, .downloadButton, input, select, .selectize-control,
-  details, .ok-box, .warn-box, .red-box { display: none !important; }
+  details, .ok-box, .warn-box, .red-box, .checkbox, .shiny-input-container { display: none !important; }
   .col-sm-8, .col-sm-4 { width: 100% !important; float: none !important; }
   .wet-card { box-shadow: none !important; border: 1px solid #ddd !important; }
-  body { background: #fff !important; }
+  body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   #summary_print_header { display: block !important; }
+  tr[style*='background-color: rgb(253, 232, 232)'] td,
+  tr[style*='background-color:#fde8e8'] td { background-color: #fde8e8 !important; font-weight: 600 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 #summary_print_header { display: none; }
 "
@@ -376,7 +378,7 @@ ui <- fluidPage(
           br(),
           div(
             id = "summary_print_header",
-            h4(paste("Printed:", format(Sys.Date(), "%B %d, %Y"))),
+            h4(paste("Report:", format(Sys.Date(), "%B %d, %Y"))),
             hr()
           ),
           div(
@@ -1859,6 +1861,7 @@ server <- function(input, output, session) {
             var stale = parseInt(d[ncols - 1]);
             if (!isNaN(stale) && stale >= 2) {
               $(this.node()).css('background-color', '#fde8e8');
+              $(this.node()).find('td').css({'background-color': '#fde8e8', 'font-weight': '600'});
             }
           });
         }
