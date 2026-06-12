@@ -321,6 +321,16 @@ ui <- fluidPage(
         tabPanel(
           "Irrigation Explorer",
           br(),
+          div(
+            style = "background: #eaf4fb; border-left: 4px solid #2e86c1; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #1a3a52;",
+            tags$b("\U0001f4a7 How to use this tab:"),
+            tags$ol(
+              style = "margin: 6px 0 0 0; padding-left: 20px;",
+              tags$li(tags$b("Planning tool (top):"), " Enter an expected daily ET rate and forecast horizon to project soil water depletion forward in time. Use this to estimate when your next irrigation is due and to evaluate different irrigation amounts."),
+              tags$li(tags$b("7-Day ETo forecast (bottom):"), " Uses live reference ET forecast and a crop coefficient (Kc) to estimate ET for the next 7 days. Use this for a weather-based irrigation date."),
+              tags$li(tags$b("Combined:"), " Use the planning tool for scheduling decisions, and the forecast to validate or refine your ET estimate before irrigating.")
+            )
+          ),
           fluidRow(
             column(3, div(class = "metric", div(class = "label", "Current Soil Water"), div(class = "value", textOutput("sc_cur_swc")))),
             column(3, div(class = "metric", div(class = "label", "Available Before MAD"), div(class = "value", textOutput("sc_available")))),
