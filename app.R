@@ -305,6 +305,12 @@ ui <- fluidPage(
           br(),
           div(
             class = "wet-card",
+            div(
+              style = "background: #eaf4fb; border-left: 4px solid #2e86c1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; color: #1a3a52;",
+              tags$b("\U0001f4cb How to log irrigation: "),
+              "Select a date, enter the net water applied (in.), add an optional note, and click ",
+              tags$b("Add/update"), ". You can also edit or delete entries directly in the table below."
+            ),
             p(class = "help-text", "When checked, the soil water balance credits OpenET precipitation in addition to entered irrigation: irrigation + precipitation - ETa."),
             checkboxInput("count_precip_effective", "Count all OpenET precipitation as effective water", value = default_setup$count_precip_effective),
             fluidRow(
