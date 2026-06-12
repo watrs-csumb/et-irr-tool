@@ -1718,7 +1718,7 @@ server <- function(input, output, session) {
         lats <- c(lats, lat)
         lons <- c(lons, lon)
         is_active <- identical(k, cur_key)
-        popup_txt <- paste0(
+        hover_txt <- paste0(
           "<b>", fd$setup$field_id %||% "", "</b>",
           if (is_active) " <em>(current)</em>" else "", "<br>",
           "Crop: ", fd$setup$crop %||% "", "<br>",
@@ -1726,8 +1726,11 @@ server <- function(input, output, session) {
         )
         m <- m |>
           addMarkers(
-            lng = lon, lat = lat, popup = popup_txt,
-            label = fd$setup$field_id %||% ""
+            lng = lon, lat = lat,
+            label = HTML(hover_txt),
+            labelOptions = labelOptions(
+              style = list("font-size" = "13px", "padding" = "6px 10px")
+            )
           ) |>
           addLabelOnlyMarkers(
             lng = lon, lat = lat,
