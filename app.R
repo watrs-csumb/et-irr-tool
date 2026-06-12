@@ -372,6 +372,36 @@ ui <- fluidPage(
           leafletOutput("field_map", height = 520)
         ),
         tabPanel(
+          "Summary",
+          br(),
+          div(
+            id = "summary_print_header",
+            h4(paste("Printed:", format(Sys.Date(), "%B %d, %Y"))),
+            hr()
+          ),
+          div(
+            style = "margin-bottom: 12px; display: flex; align-items: center; gap: 16px;",
+            actionButton("print_summary", "Print / Save PDF",
+              onclick = "window.print();"
+            ),
+            checkboxInput("summary_include_map", "Show map and include in print", value = TRUE)
+          ),
+          div(
+            class = "wet-card",
+            h4("Fields Overview"),
+            DTOutput("summary_fields_table"),
+            uiOutput("summary_stale_legend")
+          ),
+          conditionalPanel(
+            condition = "input.summary_include_map == true",
+            div(
+              class = "wet-card",
+              h4("Field Locations"),
+              leafletOutput("summary_map", height = 420)
+            )
+          )
+        ),
+        tabPanel(
           "FAQ",
           br(),
           h2("OpenET Irrigation Water Balance Dashboard"),
@@ -710,36 +740,6 @@ ui <- fluidPage(
             )
           )
         ),
-        tabPanel(
-          "Summary",
-          br(),
-          div(
-            id = "summary_print_header",
-            h4(paste("Printed:", format(Sys.Date(), "%B %d, %Y"))),
-            hr()
-          ),
-          div(
-            style = "margin-bottom: 12px; display: flex; align-items: center; gap: 16px;",
-            actionButton("print_summary", "Print / Save PDF",
-              onclick = "window.print();"
-            ),
-            checkboxInput("summary_include_map", "Include map in print", value = TRUE)
-          ),
-          div(
-            class = "wet-card",
-            h4("Fields Overview"),
-            DTOutput("summary_fields_table"),
-            uiOutput("summary_stale_legend")
-          ),
-          conditionalPanel(
-            condition = "input.summary_include_map == true",
-            div(
-              class = "wet-card",
-              h4("Field Locations"),
-              leafletOutput("summary_map", height = 420)
-            )
-          )
-        )
       )
     )
   )
@@ -1705,10 +1705,54 @@ server <- function(input, output, session) {
   })
 
   output$field_map <- renderLeaflet({
-    leaflet() |>
-      addProviderTiles(providers$Esri.WorldImagery) |>
-      setView(lng = input$lon, lat = input$lat, zoom = 14) |>
-      addMarkers(lng = input$lon, lat = input$lat, popup = paste(input$field_id, "<br>", input$crop))
+    store <- fields_store()
+    m <- leaflet() |> addProviderTiles(providers$Esri.WorldImagery)
+    lats <- c()
+    lons <- c()
+    cur_key <- active_field_key()
+    for (k in names(store)) {
+      fd <- store[[k]]
+      lat <- fd$setup$lat
+      lon <- fd$setup$lon
+      if (!is.null(lat) && !is.null(lon) && !is.na(lat) && !is.na(lon)) {
+        lats <- c(lats, lat)
+        lons <- c(lons, lon)
+        is_active <- identical(k, cur_key)
+        popup_txt <- paste0(
+          "<b>", fd$setup$field_id %||% "", "</b>",
+          if (is_active) " <em>(current)</em>" else "", "<br>",
+          "Crop: ", fd$setup$crop %||% "", "<br>",
+          "Lat: ", round(lat, 5), "  Lon: ", round(lon, 5)
+        )
+        m <- m |>
+          addMarkers(
+            lng = lon, lat = lat, popup = popup_txt,
+            label = fd$setup$field_id %||% ""
+          ) |>
+          addLabelOnlyMarkers(
+            lng = lon, lat = lat,
+            label = fd$setup$field_id %||% "",
+            labelOptions = labelOptions(
+              noHide = TRUE, direction = "top",
+              offset = c(0, -32),
+              style = list(
+                "font-weight" = if (is_active) "700" else "600",
+                "font-size" = "12px",
+                "background" = if (is_active) "rgba(46,134,193,0.9)" else "rgba(255,255,255,0.85)",
+                "color" = if (is_active) "#fff" else "#000",
+                "border" = "none", "box-shadow" = "none",
+                "padding" = "1px 4px"
+              )
+            )
+          )
+      }
+    }
+    if (length(lats) > 1) {
+      m <- m |> fitBounds(min(lons), min(lats), max(lons), max(lats))
+    } else if (length(lats) == 1) {
+      m <- m |> setView(lng = lons[1], lat = lats[1], zoom = 14)
+    }
+    m
   })
 
   observeEvent(input$map_style,
