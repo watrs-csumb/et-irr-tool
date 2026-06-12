@@ -668,8 +668,8 @@ ui <- fluidPage(
                       tags$p(tags$code("PWP (in.) = PWP_vol (cm³/cm³) × root zone depth (in.)"), style = "margin: 4px 0 0 16px;"),
                       " This works because cm³/cm³ is dimensionless — equivalent to inches of water per inch of depth."
                     ),
-                    tags$li(tags$b("Available Water Capacity (AWC):"), " The difference between FC and PWP — the water available for plant uptake: ", tags$code("AWC = FC − PWP"), ". SSURGO also reports this directly as ", tags$code("awc_r"), " (cm/cm), which is used as a cross-check."),
-                    tags$li(tags$b("Allowable depletion:"), " Set at 50% MAD: ", tags$code("Allowable depletion = FC − 0.5 × AWC"), ". Irrigation is recommended when soil water falls to this level.")
+                    tags$li(tags$b("Available Water Capacity (AWC):"), " The difference between FC and PWP — the water available for plant uptake: ", tags$code("AWC = FC − PWP"), ". SSURGO also reports this directly as ", tags$code("awc_r"), " (cm/cm)."),
+                    tags$li(tags$b("Allowable depletion:"), " Set at 50% MAD (Management Allowed Depletion): ", tags$code("Allowable depletion = FC − 0.5 × (FC − PWP)"), ". This is the soil water content exactly halfway between FC and PWP. Irrigation is recommended when soil water falls to this level.")
                   )
                 )
               )
