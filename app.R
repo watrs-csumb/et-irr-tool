@@ -239,8 +239,8 @@ ui <- fluidPage(
         br(),
         numericInput("app_rate", "Net application rate, in/hr", default_setup$application_rate_in_hr, step = 0.0001),
         numericInput("initial_water", "Initial water content, in.", default_setup$initial_water_content_in, step = 0.1),
-        numericInput("allowable_dryness", HTML("Allowable depletion, in."), default_setup$allowable_dryness_in, step = 0.1),
         numericInput("field_capacity", HTML("Field capacity*, in."), default_setup$field_capacity_in, step = 0.1),
+        numericInput("allowable_dryness", HTML("Allowable depletion*, in."), default_setup$allowable_dryness_in, step = 0.1),
         numericInput("pwp", HTML("Permanent wilting point*, in."), default_setup$permanent_wilting_point_in, step = 0.1),
         tags$p(tags$em("* Can be updated using SSURGO"), style = "font-size: 11px; color: #4a6a8a; margin-top: 6px; margin-bottom: 2px;")
       ),
