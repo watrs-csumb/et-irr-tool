@@ -300,7 +300,7 @@ ui <- fluidPage(
               div(class = "wet-card", h4(textOutput("soil_title")), withSpinner(plotlyOutput("soil_plot", height = 380), type = 6, color = "#2e86c1", size = 0.7))
             ),
             tabPanel(
-              "ET",
+              "Cumulative ET and Irrigation",
               br(),
               div(class = "wet-card", h4(textOutput("eta_title")), withSpinner(plotlyOutput("eta_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
             ),
