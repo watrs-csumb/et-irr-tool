@@ -719,10 +719,11 @@ ui <- fluidPage(
             hr()
           ),
           div(
-            style = "margin-bottom: 12px;",
+            style = "margin-bottom: 12px; display: flex; align-items: center; gap: 16px;",
             actionButton("print_summary", "Print / Save PDF",
               onclick = "window.print();"
-            )
+            ),
+            checkboxInput("summary_include_map", "Include map in print", value = TRUE)
           ),
           div(
             class = "wet-card",
@@ -730,10 +731,13 @@ ui <- fluidPage(
             DTOutput("summary_fields_table"),
             uiOutput("summary_stale_legend")
           ),
-          div(
-            class = "wet-card",
-            h4("Field Locations"),
-            leafletOutput("summary_map", height = 420)
+          conditionalPanel(
+            condition = "input.summary_include_map == true",
+            div(
+              class = "wet-card",
+              h4("Field Locations"),
+              leafletOutput("summary_map", height = 420)
+            )
           )
         )
       )
@@ -1798,20 +1802,14 @@ server <- function(input, output, session) {
     rownames = FALSE,
     options = list(
       pageLength = 25, scrollX = TRUE, ordering = FALSE, dom = "t",
-      columnDefs = list(list(
-        visible = FALSE, targets = "_all",
-        render = JS("function(d,t,r,m){ return d; }")
-      )) # placeholder; real hide via initComplete
+      columnDefs = list(list(visible = FALSE, targets = -1))
     ),
     callback = JS("
-      // hide .stale_days column (last column)
-      var tbl = table;
+      // colour rows where .stale_days (last column) >= 2
       var ncols = table.columns().count();
-      table.column(ncols - 1).visible(false);
-      // colour rows where stale_days >= 2
       table.rows().every(function() {
         var d = this.data();
-        var stale = d[ncols - 1];
+        var stale = parseInt(d[ncols - 1]);
         if (!isNaN(stale) && stale >= 2) {
           $(this.node()).css({'background-color': '#fde8e8', 'color': '#7b1212'});
         }
@@ -1824,7 +1822,8 @@ server <- function(input, output, session) {
     if (length(store) == 0) {
       return(NULL)
     }
-    stale_fields <- character(0)
+    stale_items <- list()
+    fresh_items <- list()
     for (fd in store) {
       od <- fd$openet_data
       s <- fd$setup
@@ -1848,13 +1847,19 @@ server <- function(input, output, session) {
             bal <- compute_water_balance(fd$irrigation_data, od, setup_s)
             last_date <- as.Date(tail(bal$date, 1))
             days_stale <- as.integer(Sys.Date() - last_date)
+            field_name <- s$field_id %||% "Unknown"
+            label <- sprintf(
+              "%s — last data: %s (%d day%s ago)",
+              field_name, format(last_date, "%b %d, %Y"),
+              days_stale, if (days_stale == 1) "" else "s"
+            )
             if (!is.na(days_stale) && days_stale >= 2) {
-              stale_fields <- c(stale_fields, sprintf(
-                "%s (last data: %s, %d day%s ago)",
-                s$field_id %||% "Unknown",
-                format(last_date, "%b %d, %Y"),
-                days_stale,
-                if (days_stale == 1) "" else "s"
+              stale_items <- c(stale_items, list(
+                tags$li(tags$span(style = "color:#7b1212;", tags$b("\u26a0 "), label))
+              ))
+            } else {
+              fresh_items <- c(fresh_items, list(
+                tags$li(tags$span(style = "color:#1a6b35;", tags$b("\u2713 "), label))
               ))
             }
           },
@@ -1862,18 +1867,25 @@ server <- function(input, output, session) {
         )
       }
     }
-    if (length(stale_fields) == 0) {
+    if (length(stale_items) == 0 && length(fresh_items) == 0) {
       return(NULL)
     }
+    has_stale <- length(stale_items) > 0
     div(
-      style = "margin-top: 14px; padding: 10px 14px; background: #fde8e8; border: 1px solid #f5a0a0; border-radius: 8px; font-size: 13px; color: #7b1212;",
-      tags$b("\u26a0 Stale forecast: "),
-      " The highlighted row(s) below have soil water balance data that does not reflect current conditions. ",
-      "The \u2018Irrigate By\u2019 date is projected from the last available data date, not today. ",
-      "Update the end date and refresh OpenET data for an accurate forecast.",
+      style = paste0(
+        "margin-top: 14px; padding: 10px 14px; border-radius: 8px; font-size: 13px; ",
+        if (has_stale) "background: #fde8e8; border: 1px solid #f5a0a0;" else "background: #ecfdf3; border: 1px solid #abefc6;"
+      ),
+      tags$b("Data currency by field:"),
+      if (has_stale) {
+        tags$span(
+          style = "color:#7b1212; margin-left: 6px;",
+          "\u26a0 Highlighted rows have outdated soil water data \u2014 the \u2018Irrigate By\u2019 date is projected from the last available date, not today."
+        )
+      },
       tags$ul(
         style = "margin: 6px 0 0 0; padding-left: 18px;",
-        lapply(stale_fields, tags$li)
+        c(stale_items, fresh_items)
       )
     )
   })
