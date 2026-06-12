@@ -1812,10 +1812,27 @@ server <- function(input, output, session) {
           "PWP: ", round(fd$setup$pwp %||% NA_real_, 2), " in. &nbsp; ",
           "MAD: ", round(fd$setup$allowable_dryness %||% NA_real_, 2), " in."
         )
-        m <- m |> addMarkers(
-          lng = lon, lat = lat, popup = popup_txt,
-          label = fd$setup$field_id %||% ""
-        )
+        m <- m |>
+          addMarkers(
+            lng = lon, lat = lat, popup = popup_txt,
+            label = fd$setup$field_id %||% ""
+          ) |>
+          addLabelOnlyMarkers(
+            lng = lon, lat = lat,
+            label = fd$setup$field_id %||% "",
+            labelOptions = labelOptions(
+              noHide = TRUE, direction = "top",
+              offset = c(0, -32),
+              style = list(
+                "font-weight" = "600",
+                "font-size" = "12px",
+                "background" = "rgba(255,255,255,0.85)",
+                "border" = "none",
+                "box-shadow" = "none",
+                "padding" = "1px 4px"
+              )
+            )
+          )
       }
     }
     if (length(lats) > 1) {
