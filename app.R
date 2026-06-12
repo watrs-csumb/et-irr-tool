@@ -292,13 +292,29 @@ ui <- fluidPage(
             column(3, div(class = "metric", div(class = "label", "Deep Percolation, in."), div(class = "value", textOutput("m_deep"))))
           ),
           br(),
-          div(class = "wet-card", h4(textOutput("soil_title")), withSpinner(plotlyOutput("soil_plot", height = 380), type = 6, color = "#2e86c1", size = 0.7)),
-          div(
-            class = "wet-card", h4(textOutput("eta_title")),
-            withSpinner(plotlyOutput("eta_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7)
-          ),
-          div(class = "wet-card", h4(textOutput("deep_title")), withSpinner(plotlyOutput("deep_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7)),
-          div(class = "wet-card", h4(textOutput("kc_title")), withSpinner(plotlyOutput("kc_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
+          tabsetPanel(
+            type = "pills",
+            tabPanel(
+              "Soil Water",
+              br(),
+              div(class = "wet-card", h4(textOutput("soil_title")), withSpinner(plotlyOutput("soil_plot", height = 380), type = 6, color = "#2e86c1", size = 0.7))
+            ),
+            tabPanel(
+              "ET",
+              br(),
+              div(class = "wet-card", h4(textOutput("eta_title")), withSpinner(plotlyOutput("eta_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
+            ),
+            tabPanel(
+              "Deep Percolation",
+              br(),
+              div(class = "wet-card", h4(textOutput("deep_title")), withSpinner(plotlyOutput("deep_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
+            ),
+            tabPanel(
+              "Crop Coefficient",
+              br(),
+              div(class = "wet-card", h4(textOutput("kc_title")), withSpinner(plotlyOutput("kc_plot", height = 330), type = 6, color = "#2e86c1", size = 0.7))
+            )
+          )
         ),
         tabPanel(
           "Irrigation Amounts",
