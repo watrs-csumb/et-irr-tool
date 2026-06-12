@@ -848,13 +848,13 @@ server <- function(input, output, session) {
             tags$tr(tags$td(HTML("<b>Field Capacity (FC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$field_capacity_in), style = "padding: 2px 0;")),
             tags$tr(tags$td(HTML("<b>Perm. Wilting Point (PWP):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$pwp_in), style = "padding: 2px 0;")),
             tags$tr(tags$td(HTML("<b>Avail. Water Capacity (AWC):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$awc_in), style = "padding: 2px 0;")),
-            tags$tr(tags$td(HTML("<b>50% MAD (reference):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$allowable_dryness_in), style = "padding: 2px 0;"))
+            tags$tr(tags$td(HTML("<b>Allowable depletion (50% MAD):</b>"), style = "padding: 2px 6px 2px 0;"), tags$td(sprintf("%.2f in.", s$allowable_dryness_in), style = "padding: 2px 0;"))
           ),
           hr(style = "margin: 6px 0;"),
-          p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity and PWP updated."),
+          p(style = "color: #388E3C; margin: 0;", icon("check-circle"), " Field capacity, PWP, and allowable depletion updated."),
           p(
             style = "color: #667085; font-size: 11px; margin: 4px 0 0;",
-            tags$em("Allowable depletion and initial water content were not changed \u2014 set those based on management and current field conditions.")
+            tags$em("Initial water content was not changed \u2014 set that based on current field conditions.")
           )
         ))
       }
@@ -1319,6 +1319,7 @@ server <- function(input, output, session) {
         )
         updateNumericInput(session, "field_capacity", value = soil$field_capacity_in)
         updateNumericInput(session, "pwp", value = soil$pwp_in)
+        updateNumericInput(session, "allowable_dryness", value = soil$allowable_dryness_in)
         ssurgo_result(soil)
         ssurgo_status("ok")
       },
