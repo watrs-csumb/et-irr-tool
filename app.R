@@ -1532,12 +1532,14 @@ server <- function(input, output, session) {
         yaxis = list(
           title = "Inches",
           tickmode = "auto", nticks = 10,
+          rangemode = "tozero",
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
         yaxis2 = list(
           title = "Leaching Fraction",
           overlaying = "y", side = "right",
           range = list(0, 1),
+          rangemode = "tozero",
           showgrid = FALSE,
           tickformat = ".2f"
         ),
@@ -1595,12 +1597,14 @@ server <- function(input, output, session) {
         yaxis = list(
           title = "Inches",
           tickmode = "auto", nticks = 10,
+          rangemode = "tozero",
           showspikes = TRUE, spikemode = "across", spikesnap = "cursor"
         ),
         yaxis2 = list(
           title = "ET/ETo",
           overlaying = "y", side = "right",
           range = list(0, 2),
+          rangemode = "tozero",
           showgrid = FALSE,
           tickformat = ".2f"
         ),
