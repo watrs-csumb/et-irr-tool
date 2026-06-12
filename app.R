@@ -178,6 +178,16 @@ body { background-color: #f5f7fb; }
 .shiny-notification { border-radius: 10px; min-width: 300px; max-width: 380px; right: 16px !important; bottom: 16px !important; }
 .shiny-notification.shiny-notification-warning { background-color: #c0392b !important; color: #fff !important; border: none !important; }
 .shiny-notification.shiny-notification-warning .shiny-notification-close { color: #fff !important; }
+@media print {
+  .well, .navbar, .navbar-fixed-top, #show_help, .shiny-notification,
+  .nav.nav-tabs, button, .btn, .downloadButton, input, select, .selectize-control,
+  details { display: none !important; }
+  .col-sm-8, .col-sm-4 { width: 100% !important; float: none !important; }
+  .wet-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+  body { background: #fff !important; }
+  #summary_print_header { display: block !important; }
+}
+#summary_print_header { display: none; }
 "
 
 ui <- fluidPage(
@@ -200,8 +210,8 @@ ui <- fluidPage(
         div(
           style = "display: flex; align-items: center; gap: 4px; margin-bottom: 4px;",
           tags$label("Fields", style = "font-weight: 600; font-size: 14px; color: #0d1f33; margin: 0; flex: 1;"),
-          actionButton("add_field", tagList(icon("plus"), " Add field"), class = "btn-xs btn-primary", title = "Add new field", style = "padding: 2px 8px;"),
-          actionButton("delete_field", tagList(icon("trash"), " Delete field"), class = "btn-xs btn-danger", title = "Remove current field", style = "padding: 2px 8px;")
+          actionButton("add_field", tagList(tags$i(class = "fa fa-plus"), " Add field"), class = "btn-xs btn-primary", title = "Add new field", style = "padding: 2px 8px;"),
+          actionButton("delete_field", tagList(tags$i(class = "fa fa-trash"), " Delete field"), class = "btn-xs btn-danger", title = "Remove current field", style = "padding: 2px 8px;")
         ),
         selectInput("active_field_key", NULL, choices = c("Example" = "field_1"), width = "100%")
       ),
@@ -217,7 +227,7 @@ ui <- fluidPage(
           column(6, numericInput("lat", "Latitude", default_setup$latitude, step = 0.0001)),
           column(6, numericInput("lon", "Longitude", default_setup$longitude, step = 0.0001))
         ),
-        actionButton("pick_coords", tagList(icon("map-marker-alt"), " Pick from map"),
+        actionButton("pick_coords", tagList(tags$i(class = "fa fa-map-marker-alt"), " Pick from map"),
           class = "btn-primary btn-sm btn-block", style = "margin-top: -4px; margin-bottom: 6px;"
         )
       ),
@@ -695,10 +705,34 @@ ui <- fluidPage(
               "Have suggestions or found a bug? We'd love to hear from you.",
               style = "margin-bottom: 6px; font-size: 13px;"
             ),
-            actionButton("open_feedback", "Send Feedback",
-              icon = icon("envelope"),
+            actionButton("open_feedback", tagList(tags$i(class = "fa fa-envelope"), " Send Feedback"),
               class = "btn-sm btn-primary"
             )
+          )
+        ),
+        tabPanel(
+          "Summary",
+          br(),
+          div(
+            id = "summary_print_header",
+            h4(paste("Printed:", format(Sys.Date(), "%B %d, %Y"))),
+            hr()
+          ),
+          div(
+            style = "margin-bottom: 12px;",
+            actionButton("print_summary", "Print / Save PDF",
+              onclick = "window.print();"
+            )
+          ),
+          div(
+            class = "wet-card",
+            h4("Fields Overview"),
+            DTOutput("summary_fields_table")
+          ),
+          div(
+            class = "wet-card",
+            h4("Field Locations"),
+            leafletOutput("summary_map", height = 420)
           )
         )
       )
@@ -1681,6 +1715,116 @@ server <- function(input, output, session) {
     },
     ignoreInit = TRUE
   )
+
+  # ── Summary tab ─────────────────────────────────────────────────────────────
+  output$summary_fields_table <- renderDT(
+    {
+      store <- fields_store()
+      if (length(store) == 0) {
+        return(data.frame(Message = "No fields added yet."))
+      }
+
+      rows <- lapply(store, function(fd) {
+        s <- fd$setup
+        et_total <- NA_real_
+        applied_total <- NA_real_
+        precip_total <- NA_real_
+        cur_swc <- NA_real_
+        irrigate_by <- NA_character_
+        start_d <- tryCatch(as.Date(s$date_range[[1]]), error = function(e) as.Date(NA))
+        end_d <- tryCatch(as.Date(s$date_range[[2]]), error = function(e) as.Date(NA))
+        od <- fd$openet_data
+        if (!is.null(od) && is.data.frame(od) && nrow(od) > 0 && !is.na(start_d) && !is.na(end_d)) {
+          setup_s <- list(
+            start_date = start_d, end_date = end_d,
+            field_id = s$field_id %||% "", crop_description = s$crop %||% "",
+            latitude = s$lat %||% 0, longitude = s$lon %||% 0,
+            application_rate_in_hr = s$app_rate %||% 0,
+            initial_water_content_in = s$initial_water %||% 0,
+            allowable_dryness_in = s$allowable_dryness %||% 0,
+            field_capacity_in = s$field_capacity %||% 0,
+            permanent_wilting_point_in = s$pwp %||% 0,
+            selected_model = s$openet_model %||% "ensemble",
+            count_precip_effective = s$count_precip_effective %||% FALSE
+          )
+          tryCatch(
+            {
+              bal <- compute_water_balance(fd$irrigation_data, od, setup_s)
+              et_total <- round(sum(bal$eta_in, na.rm = TRUE), 2)
+              applied_total <- round(sum(bal$net_water_applied_in, na.rm = TRUE), 2)
+              precip_total <- round(sum(bal$precip_in, na.rm = TRUE), 2)
+              cur_swc <- round(tail(bal$soil_water_content_in, 1), 2)
+              mad_in <- round(tail(bal$allowable_dryness_in, 1), 2)
+              last_date <- as.Date(tail(bal$date, 1))
+              recent <- bal[bal$eta_in > 0, ]
+              avg_et <- if (nrow(recent) >= 1) mean(tail(recent$eta_in, 7)) else NA_real_
+              if (!is.na(avg_et) && avg_et > 0 && !is.na(cur_swc) && !is.na(mad_in) && cur_swc > mad_in) {
+                days_left <- ceiling((cur_swc - mad_in) / avg_et)
+                irrigate_by <- format(last_date + days_left, "%Y-%m-%d")
+              } else if (!is.na(cur_swc) && !is.na(mad_in) && cur_swc <= mad_in) {
+                irrigate_by <- "Now"
+              }
+              mad_val <- NULL
+            },
+            error = function(e) NULL
+          )
+        }
+        data.frame(
+          Field = s$field_id %||% "",
+          Crop = s$crop %||% "",
+          From = if (!is.na(start_d)) as.character(start_d) else "",
+          To = if (!is.na(end_d)) as.character(end_d) else "",
+          Lat = round(s$lat %||% NA_real_, 5),
+          Lon = round(s$lon %||% NA_real_, 5),
+          `FC (in.)` = round(s$field_capacity %||% NA_real_, 2),
+          `PWP (in.)` = round(s$pwp %||% NA_real_, 2),
+          `MAD (in.)` = round(s$allowable_dryness %||% NA_real_, 2),
+          `ETa (in.)` = et_total,
+          `Applied (in.)` = applied_total,
+          `Precip (in.)` = precip_total,
+          `Cur. SWC (in.)` = cur_swc,
+          `Irrigate By` = irrigate_by,
+          check.names = FALSE, stringsAsFactors = FALSE
+        )
+      })
+      do.call(rbind, rows)
+    },
+    rownames = FALSE,
+    options = list(pageLength = 25, scrollX = TRUE, ordering = FALSE, dom = "t")
+  )
+
+  output$summary_map <- renderLeaflet({
+    store <- fields_store()
+    m <- leaflet() |> addProviderTiles(providers$Esri.WorldImagery)
+    lats <- c()
+    lons <- c()
+    for (fd in store) {
+      lat <- fd$setup$lat
+      lon <- fd$setup$lon
+      if (!is.null(lat) && !is.null(lon) && !is.na(lat) && !is.na(lon)) {
+        lats <- c(lats, lat)
+        lons <- c(lons, lon)
+        popup_txt <- paste0(
+          "<b>", fd$setup$field_id %||% "", "</b><br>",
+          "Crop: ", fd$setup$crop %||% "", "<br>",
+          "Lat: ", round(lat, 5), "  Lon: ", round(lon, 5), "<br>",
+          "FC: ", round(fd$setup$field_capacity %||% NA_real_, 2), " in. &nbsp; ",
+          "PWP: ", round(fd$setup$pwp %||% NA_real_, 2), " in. &nbsp; ",
+          "MAD: ", round(fd$setup$allowable_dryness %||% NA_real_, 2), " in."
+        )
+        m <- m |> addMarkers(
+          lng = lon, lat = lat, popup = popup_txt,
+          label = fd$setup$field_id %||% ""
+        )
+      }
+    }
+    if (length(lats) > 1) {
+      m <- m |> fitBounds(min(lons), min(lats), max(lons), max(lats))
+    } else if (length(lats) == 1) {
+      m <- m |> setView(lng = lons[1], lat = lats[1], zoom = 13)
+    }
+    m
+  })
 
   output$download_balance <- downloadHandler(
     filename = function() paste0("openet_wetgraph_", input$field_id, "_", as.Date(input$date_range[1]), "_", as.Date(input$date_range[2]), ".xlsx"),
