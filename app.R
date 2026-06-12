@@ -181,7 +181,7 @@ body { background-color: #f5f7fb; }
 @media print {
   .well, .navbar, .navbar-fixed-top, #show_help, .shiny-notification,
   .nav.nav-tabs, button, .btn, .downloadButton, input, select, .selectize-control,
-  details { display: none !important; }
+  details, .ok-box, .warn-box, .red-box { display: none !important; }
   .col-sm-8, .col-sm-4 { width: 100% !important; float: none !important; }
   .wet-card { box-shadow: none !important; border: 1px solid #ddd !important; }
   body { background: #fff !important; }
@@ -727,7 +727,8 @@ ui <- fluidPage(
           div(
             class = "wet-card",
             h4("Fields Overview"),
-            DTOutput("summary_fields_table")
+            DTOutput("summary_fields_table"),
+            uiOutput("summary_stale_legend")
           ),
           div(
             class = "wet-card",
@@ -1731,6 +1732,7 @@ server <- function(input, output, session) {
         precip_total <- NA_real_
         cur_swc <- NA_real_
         irrigate_by <- NA_character_
+        stale_days <- NA_integer_
         start_d <- tryCatch(as.Date(s$date_range[[1]]), error = function(e) as.Date(NA))
         end_d <- tryCatch(as.Date(s$date_range[[2]]), error = function(e) as.Date(NA))
         od <- fd$openet_data
@@ -1756,6 +1758,7 @@ server <- function(input, output, session) {
               cur_swc <- round(tail(bal$soil_water_content_in, 1), 2)
               mad_in <- round(tail(bal$allowable_dryness_in, 1), 2)
               last_date <- as.Date(tail(bal$date, 1))
+              stale_days <- as.integer(Sys.Date() - last_date)
               recent <- bal[bal$eta_in > 0, ]
               avg_et <- if (nrow(recent) >= 1) mean(tail(recent$eta_in, 7)) else NA_real_
               if (!is.na(avg_et) && avg_et > 0 && !is.na(cur_swc) && !is.na(mad_in) && cur_swc > mad_in) {
@@ -1764,7 +1767,6 @@ server <- function(input, output, session) {
               } else if (!is.na(cur_swc) && !is.na(mad_in) && cur_swc <= mad_in) {
                 irrigate_by <- "Now"
               }
-              mad_val <- NULL
             },
             error = function(e) NULL
           )
@@ -1784,14 +1786,97 @@ server <- function(input, output, session) {
           `Precip (in.)` = precip_total,
           `Cur. SWC (in.)` = cur_swc,
           `Irrigate By` = irrigate_by,
+          `.stale_days` = stale_days,
           check.names = FALSE, stringsAsFactors = FALSE
         )
       })
-      do.call(rbind, rows)
+      df <- do.call(rbind, rows)
+      stale_col <- which(names(df) == ".stale_days") - 1L # 0-based for JS
+      attr(df, "stale_col_idx") <- stale_col
+      df
     },
     rownames = FALSE,
-    options = list(pageLength = 25, scrollX = TRUE, ordering = FALSE, dom = "t")
+    options = list(
+      pageLength = 25, scrollX = TRUE, ordering = FALSE, dom = "t",
+      columnDefs = list(list(
+        visible = FALSE, targets = "_all",
+        render = JS("function(d,t,r,m){ return d; }")
+      )) # placeholder; real hide via initComplete
+    ),
+    callback = JS("
+      // hide .stale_days column (last column)
+      var tbl = table;
+      var ncols = table.columns().count();
+      table.column(ncols - 1).visible(false);
+      // colour rows where stale_days >= 2
+      table.rows().every(function() {
+        var d = this.data();
+        var stale = d[ncols - 1];
+        if (!isNaN(stale) && stale >= 2) {
+          $(this.node()).css({'background-color': '#fde8e8', 'color': '#7b1212'});
+        }
+      });
+    ")
   )
+
+  output$summary_stale_legend <- renderUI({
+    store <- fields_store()
+    if (length(store) == 0) {
+      return(NULL)
+    }
+    stale_fields <- character(0)
+    for (fd in store) {
+      od <- fd$openet_data
+      s <- fd$setup
+      end_d <- tryCatch(as.Date(s$date_range[[2]]), error = function(e) as.Date(NA))
+      if (!is.null(od) && is.data.frame(od) && nrow(od) > 0 && !is.na(end_d)) {
+        tryCatch(
+          {
+            setup_s <- list(
+              start_date = tryCatch(as.Date(s$date_range[[1]]), error = function(e) as.Date(NA)),
+              end_date = end_d,
+              field_id = s$field_id %||% "", crop_description = s$crop %||% "",
+              latitude = s$lat %||% 0, longitude = s$lon %||% 0,
+              application_rate_in_hr = s$app_rate %||% 0,
+              initial_water_content_in = s$initial_water %||% 0,
+              allowable_dryness_in = s$allowable_dryness %||% 0,
+              field_capacity_in = s$field_capacity %||% 0,
+              permanent_wilting_point_in = s$pwp %||% 0,
+              selected_model = s$openet_model %||% "ensemble",
+              count_precip_effective = s$count_precip_effective %||% FALSE
+            )
+            bal <- compute_water_balance(fd$irrigation_data, od, setup_s)
+            last_date <- as.Date(tail(bal$date, 1))
+            days_stale <- as.integer(Sys.Date() - last_date)
+            if (!is.na(days_stale) && days_stale >= 2) {
+              stale_fields <- c(stale_fields, sprintf(
+                "%s (last data: %s, %d day%s ago)",
+                s$field_id %||% "Unknown",
+                format(last_date, "%b %d, %Y"),
+                days_stale,
+                if (days_stale == 1) "" else "s"
+              ))
+            }
+          },
+          error = function(e) NULL
+        )
+      }
+    }
+    if (length(stale_fields) == 0) {
+      return(NULL)
+    }
+    div(
+      style = "margin-top: 14px; padding: 10px 14px; background: #fde8e8; border: 1px solid #f5a0a0; border-radius: 8px; font-size: 13px; color: #7b1212;",
+      tags$b("\u26a0 Stale forecast: "),
+      " The highlighted row(s) below have soil water balance data that does not reflect current conditions. ",
+      "The \u2018Irrigate By\u2019 date is projected from the last available data date, not today. ",
+      "Update the end date and refresh OpenET data for an accurate forecast.",
+      tags$ul(
+        style = "margin: 6px 0 0 0; padding-left: 18px;",
+        lapply(stale_fields, tags$li)
+      )
+    )
+  })
 
   output$summary_map <- renderLeaflet({
     store <- fields_store()
